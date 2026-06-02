@@ -46,17 +46,11 @@ class MainHolder extends StatelessWidget {
             const SizedBox(width: 8),
 
             // Copy Code Button
+            // Copy Code Button
             IconButton(
               icon: const Icon(Icons.code),
               color: Colors.blueAccent,
-              onPressed: () {
-                // We will implement the CopyCode string generator in Checkpoint 6
-                Get.snackbar(
-                  'Copy Code',
-                  'Code generation engine will be attached here.',
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-              },
+              onPressed: () => controller.copyCodeToClipboard(), // Connected!
               tooltip: 'Copy Code',
             ),
           ],

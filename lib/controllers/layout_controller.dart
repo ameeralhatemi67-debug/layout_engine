@@ -5,6 +5,9 @@ import 'package:layout_engine/controllers/math_engine.dart';
 import '../models/layout_node.dart';
 import '../services/storage_service.dart';
 
+import 'package:flutter/services.dart'; // Required for Clipboard access
+import '../services/code_generator_service.dart';
+
 class LayoutController extends GetxController {
   /// The maximum number of states allowed in memory to prevent leaks.
   static const int maxHistory = 30;
@@ -339,5 +342,38 @@ class LayoutController extends GetxController {
       if (found != null) return found;
     }
     return null;
+  }
+
+  /// Task 1 & 2: Export Engine
+  /// Generates the code and copies the raw string directly to the device clipboard.
+  void copyCodeToClipboard() {
+    // 1. Generate the raw string using your custom service
+    final String generatedCode = CodeGeneratorService.generateCode(
+      activeLayout,
+    );
+
+    // 2. Access the device clipboard and set the text
+    Clipboard.setData(ClipboardData(text: generatedCode))
+        .then((_) {
+          // 3. Provide visual feedback that the action succeeded
+          Get.snackbar(
+            'Code Exported!',
+            'Production-ready Flutter code copied to clipboard.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green.shade700,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 3),
+            icon: const Icon(Icons.check_circle, color: Colors.white),
+          );
+        })
+        .catchError((error) {
+          Get.snackbar(
+            'Export Failed',
+            'Could not access device clipboard.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.redAccent,
+            colorText: Colors.white,
+          );
+        });
   }
 }
