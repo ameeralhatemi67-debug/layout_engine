@@ -153,4 +153,34 @@ class LayoutController extends GetxController {
     // 4. Save to history and update UI
     saveState();
   }
+
+  // --- ADD THESE VARIABLES ---
+  /// Tracks the currently selected node for deep modifications.
+  String? selectedNodeId;
+
+  // --- ADD THESE METHODS ---
+  /// Selects or deselects a node in the layout tree.
+  void selectNode(String? id) {
+    selectedNodeId = id;
+    update(); // Rebuild the UI to show the selection highlight
+  }
+
+  /// Task 2: Implement custom layer naming
+  void updateLayerName(String id, String newName) {
+    final node = _findNodeById(activeLayout, id);
+    if (node != null) {
+      node.properties['layer_name'] = newName;
+      saveState(); // Saves the new name to Hive and the Undo stack
+    }
+  }
+
+  /// Recursive helper to find a specific node by its UUID
+  LayoutNode? _findNodeById(LayoutNode current, String targetId) {
+    if (current.id == targetId) return current;
+    for (var child in current.children) {
+      final found = _findNodeById(child, targetId);
+      if (found != null) return found;
+    }
+    return null;
+  }
 }

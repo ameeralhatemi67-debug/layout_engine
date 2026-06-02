@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'views/overlays/layer_window.dart';
 import 'package:layout_engine/views/overlays/create_holder.dart';
 import 'package:layout_engine/views/overlays/main_holder.dart';
 import 'controllers/layout_controller.dart';
@@ -38,6 +39,15 @@ class LayoutEngineApp extends StatelessWidget {
                 child: Padding(
                   padding: EdgeInsets.only(top: 24.0),
                   child: MainHolder(),
+                ),
+              ),
+
+              // 3. The Matrix UI (Left Center)
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 16.0),
+                  child: LayerWindow(),
                 ),
               ),
 
