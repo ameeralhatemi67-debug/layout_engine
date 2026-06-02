@@ -29,19 +29,19 @@ class CreateHolder extends StatelessWidget {
                 _buildActionBtn(
                   icon: Icons.view_column,
                   label: '3 Cols',
-                  onTap: () => controller.applyBaselineSplit(3, 'RowNode'),
+                  onTap: () => controller.attemptSplit(3, 'RowNode'),
                 ),
                 const SizedBox(width: 8),
                 _buildActionBtn(
                   icon: Icons.table_rows,
                   label: '3 Rows',
-                  onTap: () => controller.applyBaselineSplit(3, 'ColumnNode'),
+                  onTap: () => controller.attemptSplit(3, 'ColumnNode'),
                 ),
                 const SizedBox(width: 8),
                 _buildActionBtn(
                   icon: Icons.grid_view,
                   label: '4 Cols',
-                  onTap: () => controller.applyBaselineSplit(4, 'RowNode'),
+                  onTap: () => controller.attemptSplit(4, 'RowNode'),
                 ),
               ],
             ),

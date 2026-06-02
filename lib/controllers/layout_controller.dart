@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:layout_engine/controllers/math_engine.dart';
 import '../models/layout_node.dart';
@@ -127,51 +128,207 @@ class LayoutController extends GetxController {
     canRedo.value = _currentIndex < _historyStack.length - 1;
   }
 
-  /// Applies a baseline split to the active layout (MVP: targets the root node)
-  void applyBaselineSplit(int numberOfSplits, String nodeType) {
-    // 1. Calculate the math
-    final splits = MathEngine.splitEdit(numberOfSplits);
+  /// TASK 2: Destructive Action Guards
+  void attemptSplit(int numberOfSplits, String nodeType) {
+    List<LayoutNode> targets = [];
 
-    // 2. Clear existing children and generate new ones based on the math
-    activeLayout.children.clear();
-    for (int i = 0; i < numberOfSplits; i++) {
-      activeLayout.children.add(
-        LayoutNode(
-          type: 'ContainerNode', // A generic leaf node waiting for content
-          properties: {
-            'flex_value': splits[i],
-            'is_locked': false,
-            'layer_name': 'Split ${i + 1}',
-          },
-        ),
-      );
+    // If nothing is selected, default to splitting the root canvas
+    if (selectedNodeIds.isEmpty) {
+      targets.add(activeLayout);
+    } else {
+      targets = selectedNodeIds
+          .map((id) => _findNodeById(activeLayout, id))
+          .whereType<LayoutNode>()
+          .toList();
     }
 
-    // 3. Update the parent type (RowNode or ColumnNode)
-    activeLayout.type = nodeType;
+    // Check if any targeted branch already contains nested children
+    bool hasChildren = targets.any((node) => node.children.isNotEmpty);
 
-    // 4. Save to history and update UI
+    if (hasChildren) {
+      Get.defaultDialog(
+        title: 'Destructive Action Warning',
+        middleText:
+            'This will permanently overwrite the nested layouts inside the selected branches. Are you sure?',
+        textConfirm: 'Overwrite',
+        textCancel: 'Cancel',
+        confirmTextColor: Colors.white,
+        buttonColor: Colors.redAccent,
+        onConfirm: () {
+          Get.back(); // Close dialog
+          _executeSplit(targets, numberOfSplits, nodeType);
+        },
+      );
+    } else {
+      _executeSplit(targets, numberOfSplits, nodeType);
+    }
+  }
+
+  /// Executes the mathematical split on all targeted nodes
+  void _executeSplit(
+    List<LayoutNode> targets,
+    int numberOfSplits,
+    String nodeType,
+  ) {
+    final splits = MathEngine.splitEdit(numberOfSplits);
+
+    for (var target in targets) {
+      target.children.clear();
+      for (int i = 0; i < numberOfSplits; i++) {
+        target.children.add(
+          LayoutNode(
+            type: 'ContainerNode',
+            properties: {
+              'flex_value': splits[i],
+              'is_locked': false,
+              'layer_name': 'Split ${i + 1}',
+            },
+          ),
+        );
+      }
+      target.type = nodeType; // Transform the parent into a Row or Column
+    }
+
+    // Important: Clear selections after a structural change to prevent orphaned IDs
+    selectedNodeIds.clear();
     saveState();
   }
 
-  // --- ADD THESE VARIABLES ---
-  /// Tracks the currently selected node for deep modifications.
-  String? selectedNodeId;
+  // --- UPGRADED SELECTION STATE ---
+  /// Tracks multiple selected nodes for bulk editing and synchronization.
+  Set<String> selectedNodeIds = {};
 
-  // --- ADD THESE METHODS ---
-  /// Selects or deselects a node in the layout tree.
-  void selectNode(String? id) {
-    selectedNodeId = id;
-    update(); // Rebuild the UI to show the selection highlight
+  /// Task 1 & 3: Upgraded Selection with Ancestry Exclusivity
+  void selectNode(String id) {
+    // 1. Toggle off if already selected
+    if (selectedNodeIds.contains(id)) {
+      selectedNodeIds.remove(id);
+      update();
+      return;
+    }
+
+    // 2. TASK 1: Ancestry Conflict Check
+    final newPath = _getPathToNode(activeLayout, id);
+    if (newPath == null) return;
+
+    bool hasConflict = false;
+    for (String selectedId in selectedNodeIds) {
+      final selectedPath = _getPathToNode(activeLayout, selectedId);
+      if (selectedPath == null) continue;
+
+      // If the new node is inside an already selected node, or vice versa, block it.
+      if (newPath.any((n) => n.id == selectedId) ||
+          selectedPath.any((n) => n.id == id)) {
+        hasConflict = true;
+        break;
+      }
+    }
+
+    if (hasConflict) {
+      Get.snackbar(
+        'Selection Blocked',
+        'Ancestry Conflict: Cannot select a parent and a child simultaneously.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    // 3. Add to selection
+    selectedNodeIds.add(id);
+    update();
+
+    // 4. TASK 3: Trigger Baseline Sync if needed
+    _checkBaselineSync();
   }
 
-  /// Task 2: Implement custom layer naming
+  /// Helper: Retrieves the exact lineage from the root down to the target node
+  List<LayoutNode>? _getPathToNode(
+    LayoutNode current,
+    String targetId, [
+    List<LayoutNode>? currentPath,
+  ]) {
+    currentPath ??= [];
+    currentPath.add(current);
+    if (current.id == targetId) return currentPath;
+
+    for (var child in current.children) {
+      final path = _getPathToNode(child, targetId, List.from(currentPath));
+      if (path != null) return path;
+    }
+    return null;
+  }
+
+  /// Implement custom layer naming
   void updateLayerName(String id, String newName) {
     final node = _findNodeById(activeLayout, id);
     if (node != null) {
       node.properties['layer_name'] = newName;
       saveState(); // Saves the new name to Hive and the Undo stack
     }
+  }
+
+  /// TASK 3: Baseline Synchronization Engine
+  void _checkBaselineSync() {
+    if (selectedNodeIds.length < 2) return;
+
+    // Retrieve the actual node objects for the selected IDs
+    List<LayoutNode> selectedNodes = selectedNodeIds
+        .map((id) => _findNodeById(activeLayout, id))
+        .whereType<LayoutNode>()
+        .toList();
+
+    if (selectedNodes.isEmpty) return;
+
+    // Compare properties against the first selected node
+    final firstProps = selectedNodes.first.properties;
+    bool mismatch = selectedNodes.any(
+      (node) =>
+          node.properties['flex_value'] != firstProps['flex_value'] ||
+          node.properties['is_locked'] != firstProps['is_locked'],
+    );
+
+    if (mismatch) {
+      // Prompt user to pick a baseline
+      Get.defaultDialog(
+        title: 'Baseline Synchronization',
+        middleText:
+            'The selected layers have conflicting mathematical properties. Please choose a baseline to sync them.',
+        content: Column(
+          children: selectedNodes
+              .map(
+                (node) => Padding(
+                  padding: const EdgeInsets.all(4.0),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _applyBaselineSync(node.id, selectedNodes);
+                      Get.back(); // Close dialog
+                    },
+                    child: Text(
+                      'Sync to: ${node.properties['layer_name'] ?? node.type}',
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
+  }
+
+  /// Applies the chosen baseline data block to all selected nodes
+  void _applyBaselineSync(String baselineId, List<LayoutNode> nodes) {
+    final baselineNode = nodes.firstWhere((n) => n.id == baselineId);
+    final baselineProps = Map<String, dynamic>.from(baselineNode.properties);
+
+    for (var node in nodes) {
+      if (node.id != baselineId) {
+        node.properties['flex_value'] = baselineProps['flex_value'];
+        node.properties['is_locked'] = baselineProps['is_locked'];
+      }
+    }
+    saveState();
   }
 
   /// Recursive helper to find a specific node by its UUID

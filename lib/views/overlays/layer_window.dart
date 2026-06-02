@@ -58,7 +58,7 @@ class LayerWindow extends StatelessWidget {
     int depth,
     BuildContext context,
   ) {
-    final isSelected = controller.selectedNodeId == node.id;
+    final isSelected = controller.selectedNodeIds.contains(node.id);
     final layerName = node.properties['layer_name'] ?? node.type;
 
     return Column(
