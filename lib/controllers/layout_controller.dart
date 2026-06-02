@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:get/get.dart';
+import 'package:layout_engine/controllers/math_engine.dart';
 import '../models/layout_node.dart';
 import '../services/storage_service.dart';
 
@@ -124,5 +125,32 @@ class LayoutController extends GetxController {
   void _updateButtonStates() {
     canUndo.value = _currentIndex > 0;
     canRedo.value = _currentIndex < _historyStack.length - 1;
+  }
+
+  /// Applies a baseline split to the active layout (MVP: targets the root node)
+  void applyBaselineSplit(int numberOfSplits, String nodeType) {
+    // 1. Calculate the math
+    final splits = MathEngine.splitEdit(numberOfSplits);
+
+    // 2. Clear existing children and generate new ones based on the math
+    activeLayout.children.clear();
+    for (int i = 0; i < numberOfSplits; i++) {
+      activeLayout.children.add(
+        LayoutNode(
+          type: 'ContainerNode', // A generic leaf node waiting for content
+          properties: {
+            'flex_value': splits[i],
+            'is_locked': false,
+            'layer_name': 'Split ${i + 1}',
+          },
+        ),
+      );
+    }
+
+    // 3. Update the parent type (RowNode or ColumnNode)
+    activeLayout.type = nodeType;
+
+    // 4. Save to history and update UI
+    saveState();
   }
 }
