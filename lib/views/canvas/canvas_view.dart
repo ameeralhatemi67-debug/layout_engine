@@ -9,62 +9,78 @@ class CanvasView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // GetBuilder listens for the update() command from LayoutController
-    // It is much more efficient than Obx for deeply nested trees.
     return GetBuilder<LayoutController>(
       builder: (controller) {
         return Container(
-          color: Colors.white,
-          // We pass isRoot: true so the very first layer doesn't try to
-          // wrap itself in an Expanded widget (which would cause an error).
-          child: _buildNode(controller.activeLayout, isRoot: true),
+          // Optional: Make the root background transparent in Preview Mode
+          color: controller.isWireframeMode.value
+              ? Colors.white
+              : Colors.transparent,
+          // We now pass the controller down into the recursive engine
+          child: _buildNode(controller.activeLayout, controller, isRoot: true),
         );
       },
     );
   }
 
   /// The Recursive Rendering Engine
-  Widget _buildNode(LayoutNode node, {bool isRoot = false}) {
+  Widget _buildNode(
+    LayoutNode node,
+    LayoutController controller, {
+    bool isRoot = false,
+  }) {
     Widget content;
+
+    // Read the global wireframe state
+    final isWireframe = controller.isWireframeMode.value;
 
     // 1. Structural Mapping (Row vs Column)
     if (node.type == 'RowNode') {
       content = Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: node.children.map((child) => _buildNode(child)).toList(),
+        // Pass the controller down to the children recursively
+        children: node.children
+            .map((child) => _buildNode(child, controller))
+            .toList(),
       );
     } else if (node.type == 'ColumnNode') {
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: node.children.map((child) => _buildNode(child)).toList(),
+        children: node.children
+            .map((child) => _buildNode(child, controller))
+            .toList(),
       );
     } else {
       // 2. Leaf Node / Placeholder Mapping
-      // This represents an empty split where the user hasn't added items yet.
       content = Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300, width: 1),
-          color: Colors.grey.shade50,
-        ),
-        child: Center(
-          child: Text(
-            node.properties['layer_name'] ?? node.id.substring(0, 4),
-            style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-          ),
-        ),
+        // Conditionally strip the borders and background color
+        decoration: isWireframe
+            ? BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300, width: 1),
+                color: Colors.grey.shade50,
+              )
+            : null,
+        // Conditionally hide the placeholder text so it looks like a real blank app
+        child: isWireframe
+            ? Center(
+                child: Text(
+                  node.properties['layer_name'] ?? node.id.substring(0, 4),
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                ),
+              )
+            : null,
       );
     }
 
     // 3. The Viewport Mapping (LockEdit)
     final isLocked = node.properties['is_locked'] == true;
     if (isLocked) {
-      // If a layout is locked, its visual footprint is constrained by the flex,
-      // but the internal content becomes a scrollable viewport.
       content = SingleChildScrollView(child: content);
     }
 
     // 4. Boundary Protection
     if (isRoot) {
-      return content; // The root layer takes the full screen
+      return content;
     }
 
     // 5. Apply the 1000-Unit Math Engine flex values

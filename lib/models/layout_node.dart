@@ -1,3 +1,4 @@
+import 'dart:convert'; // Required for Deep Copying
 import 'package:uuid/uuid.dart';
 
 class LayoutNode {
@@ -13,15 +14,40 @@ class LayoutNode {
     Map<String, dynamic>? properties,
     List<LayoutNode>? children,
   }) : id = id ?? const Uuid().v4(),
-       properties = properties ?? {},
+       properties = _initializeProperties(properties),
        children = children ?? [];
+
+  /// Task 1: Data Model Upgrade
+  /// Injects new Pillar 2 default properties and detaches nested memory references.
+  static Map<String, dynamic> _initializeProperties(
+    Map<String, dynamic>? props,
+  ) {
+    final base = props != null
+        ? Map<String, dynamic>.from(props)
+        : <String, dynamic>{};
+
+    // Inject Checkpoint 7 defaults if they do not exist yet
+    base['padding'] =
+        base['padding'] ?? {'top': 0, 'bottom': 0, 'left': 0, 'right': 0};
+    base['alignment'] = base['alignment'] ?? 'center';
+    // base['locked_size'] remains null until explicitly set by a user
+
+    // Detach nested padding map to prevent shallow-copy reference bugs
+    if (base['padding'] is Map) {
+      base['padding'] = Map<String, dynamic>.from(base['padding'] as Map);
+    }
+
+    return base;
+  }
 
   /// Deserialization from JSON (Recursive)
   factory LayoutNode.fromJson(Map<String, dynamic> json) {
     return LayoutNode(
       id: json['id'] as String?,
       type: json['type'] as String,
-      properties: Map<String, dynamic>.from(json['properties'] ?? {}),
+      properties: json['properties'] != null
+          ? Map<String, dynamic>.from(json['properties'])
+          : {},
       children:
           (json['children'] as List<dynamic>?)
               ?.map(
@@ -33,23 +59,25 @@ class LayoutNode {
     );
   }
 
-  /// Serialization to JSON (Recursive)
+  /// Task 2: Serialization to JSON (Recursive) & Safe Deep Copy
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'type': type,
-      'properties': properties,
+      // We encode and decode the properties to force a 100% clean Deep Copy of nested maps
+      'properties': jsonDecode(jsonEncode(properties)),
       'children': children.map((child) => child.toJson()).toList(),
     };
   }
 
   /// Helper Method for the Undo/Redo Engine
   LayoutNode clone() {
-    return LayoutNode.fromJson(toJson());
+    // We also force a deep copy here to guarantee the Memento history stack
+    // never accidentally mutates past padding states.
+    return LayoutNode.fromJson(jsonDecode(jsonEncode(toJson())));
   }
 
-  /// Task 1 & 2: Recursive Parsing Engine & Dynamic Indentation Tracker
-  /// Translates the JSON tree into standard, readable Flutter widgets.
+  /// Recursive Parsing Engine & Dynamic Indentation Tracker
   String toDartCode({int indentLevel = 0, bool isRoot = false}) {
     String getIndent(int level) => '  ' * level;
 
@@ -58,18 +86,15 @@ class LayoutNode {
     String suffix = '';
 
     // 1. Boundary Protection (Expanded wrapper)
-    // If it is not the root, it must be wrapped in an Expanded widget for proportional sizing.
     if (!isRoot) {
       final flexValue = properties['flex_value'] as int? ?? 1000;
       prefix += '${getIndent(currentLevel)}Expanded(\n';
       prefix += '${getIndent(currentLevel + 1)}flex: $flexValue,\n';
       prefix += '${getIndent(currentLevel + 1)}child: ';
 
-      // Suffix closes the Expanded widget after the core content is generated
       suffix = '\n${getIndent(currentLevel)}),\n' + suffix;
       currentLevel += 1;
     } else {
-      // The root layer does not get an Expanded wrapper
       prefix += getIndent(currentLevel);
       suffix = ',\n';
     }
@@ -80,7 +105,6 @@ class LayoutNode {
       prefix += 'SingleChildScrollView(\n';
       prefix += '${getIndent(currentLevel + 1)}child: ';
 
-      // Suffix closes the ScrollView
       suffix = '\n${getIndent(currentLevel)}),' + suffix;
       currentLevel += 1;
     }
@@ -93,7 +117,6 @@ class LayoutNode {
           '${getIndent(currentLevel + 1)}crossAxisAlignment: CrossAxisAlignment.stretch,\n';
       prefix += '${getIndent(currentLevel + 1)}children: [\n';
 
-      // Recursively parse all children, increasing the indentation level
       for (var child in children) {
         prefix += child.toDartCode(
           indentLevel: currentLevel + 2,
@@ -113,7 +136,6 @@ class LayoutNode {
       prefix += '\n${getIndent(currentLevel)})';
     }
 
-    // Combine the prefixes and suffixes to output the final block
     return prefix + suffix;
   }
 }

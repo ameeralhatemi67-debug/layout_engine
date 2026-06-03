@@ -26,6 +26,16 @@ class LayoutController extends GetxController {
   var canUndo = false.obs;
   var canRedo = false.obs;
 
+  // --- ADD THESE NEW LINES ---
+  /// Task 1 (Part B): Visual Toggle State for LayerView (Wireframe)
+  var isWireframeMode = true.obs;
+
+  /// Toggles the wireframe borders on the canvas.
+  void toggleWireframe() {
+    isWireframeMode.value = !isWireframeMode.value;
+    update(); // Forces the CanvasView to redraw immediately
+  }
+
   @override
   void onInit() {
     super.onInit();

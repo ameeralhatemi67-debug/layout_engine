@@ -45,12 +45,35 @@ class MainHolder extends StatelessWidget {
             ), // Divider
             const SizedBox(width: 8),
 
-            // Copy Code Button
+            // --- NEW: LayerView / Wireframe Toggle Button ---
+            Obx(
+              () => IconButton(
+                icon: Icon(
+                  controller.isWireframeMode.value
+                      ? Icons.grid_on
+                      : Icons.grid_off,
+                ),
+                color: controller.isWireframeMode.value
+                    ? Colors.blueAccent
+                    : Colors.grey.shade600,
+                onPressed: controller.toggleWireframe,
+                tooltip: 'Toggle LayerView (Wireframe)',
+              ),
+            ),
+
+            const SizedBox(width: 8),
+            Container(
+              width: 1,
+              height: 24,
+              color: Colors.grey.shade300,
+            ), // Divider
+            const SizedBox(width: 8),
+
             // Copy Code Button
             IconButton(
               icon: const Icon(Icons.code),
               color: Colors.blueAccent,
-              onPressed: () => controller.copyCodeToClipboard(), // Connected!
+              onPressed: () => controller.copyCodeToClipboard(),
               tooltip: 'Copy Code',
             ),
           ],
