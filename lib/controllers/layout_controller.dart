@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:layout_engine/controllers/base_window_interactions.dart';
 import 'package:layout_engine/controllers/math_engine.dart';
+import 'package:layout_engine/controllers/window_manager.dart';
 import '../models/layout_node.dart';
 import '../services/storage_service.dart';
 
 import 'package:flutter/services.dart'; // Required for Clipboard access
 import '../services/code_generator_service.dart';
+import '../services/error_handling.dart';
 
 class LayoutController extends GetxController {
   /// The maximum number of states allowed in memory to prevent leaks.
@@ -27,13 +30,59 @@ class LayoutController extends GetxController {
   var canRedo = false.obs;
 
   // --- ADD THESE NEW LINES ---
-  /// Task 1 (Part B): Visual Toggle State for LayerView (Wireframe)
-  var isWireframeMode = true.obs;
+  /// Visual Toggle State for the Canvas Wireframes
+  var showCanvasWireframes = true.obs;
 
-  /// Toggles the wireframe borders on the canvas.
+  /// Visual Toggle State for the Layer Window
+  var showLayerWindow = true.obs;
+
+  /// Toggles the Wireframe borders on the canvas.
   void toggleWireframe() {
-    isWireframeMode.value = !isWireframeMode.value;
-    update(); // Forces the CanvasView to redraw immediately
+    showCanvasWireframes.value = !showCanvasWireframes.value;
+    update(); // Forces the CanvasView to redraw
+  }
+
+  /// Toggles the visibility of the Layer Matrix window.
+  void toggleLayerWindow() {
+    showLayerWindow.value = !showLayerWindow.value;
+    if (showLayerWindow.value) {
+      // 1. Calculate smart spawn
+      if (Get.isRegistered<BaseWindowInteractions>(tag: 'Layer')) {
+        final logic = Get.find<BaseWindowInteractions>(tag: 'Layer');
+        logic.spawnWithAntiOverlap(
+          Size(Get.width, Get.height),
+          logic.getActiveWindowRects('Layer'),
+          'Layer',
+        );
+      }
+      // 2. Bring to the absolute front!
+      if (Get.isRegistered<WindowManager>()) {
+        Get.find<WindowManager>().bringToFront('Layer');
+      }
+    }
+    update();
+  }
+
+  // --- SPLIT WINDOW STATES ---
+  /// Visual Toggle State for Canvas-level Hand Adjustments
+  var isHandAdjustmentActive = false.obs;
+
+  /// Toggles the draggable dividers directly on the canvas
+  void toggleHandAdjustment() {
+    isHandAdjustmentActive.value = !isHandAdjustmentActive.value;
+    update(); // Redraw canvas to show/hide the hand handles
+  }
+
+  /// Toggles the 'is_locked' (LockEdit) property of a specific layout node
+  void toggleLock(String nodeId) {
+    final node = _findNodeById(activeLayout, nodeId);
+    if (node != null) {
+      bool currentLock = node.properties['is_locked'] == true;
+      node.properties['is_locked'] = !currentLock;
+
+      saveState(); // Saves the lock action to the Undo/Redo stack and Hive
+      update(); // Forces UI to redraw
+    }
   }
 
   @override
@@ -43,6 +92,7 @@ class LayoutController extends GetxController {
   }
 
   /// Bootstraps the app by reading from Hive, or creating a fresh layout.
+  /// Bootstraps the app by reading from Hive, or creating a fresh layout.
   void _loadInitialState() {
     final savedJson = StorageService.loadLayout();
 
@@ -51,13 +101,13 @@ class LayoutController extends GetxController {
       // Push the loaded state to history, but don't re-save to the DB unnecessarily.
       _pushToHistory(saveToStorage: false);
     } else {
-      // Fresh start: Create the base L1 layer taking 100% (1000 units) space.
+      // 🚀 THE FIX: Fresh start must be a ContainerNode so it renders the visual wireframe!
       activeLayout = LayoutNode(
-        type: 'ColumnNode',
+        type: 'ContainerNode',
         properties: {
           'flex_value': 1000,
           'is_locked': false,
-          'layer_name': 'L1',
+          'layer_name': 'Root Canvas',
         },
       );
       _pushToHistory();
@@ -145,9 +195,19 @@ class LayoutController extends GetxController {
   void attemptSplit(int numberOfSplits, String nodeType) {
     List<LayoutNode> targets = [];
 
-    // If nothing is selected, default to splitting the root canvas
-    if (selectedNodeIds.isEmpty) {
-      targets.add(activeLayout);
+    // FIX: If we only targeted ONE node, pop open the window AND bring to front!
+    if (targets.length == 1) {
+      selectedNodeIds = {targets.first.id};
+      if (Get.isRegistered<BaseWindowInteractions>(tag: 'Split')) {
+        Get.find<BaseWindowInteractions>(
+          tag: 'Split',
+        ).openSplitWindow(Size(Get.width, Get.height));
+      }
+      if (Get.isRegistered<WindowManager>()) {
+        Get.find<WindowManager>().bringToFront(
+          'Split',
+        ); // Brings newly opened window to top!
+      }
     } else {
       targets = selectedNodeIds
           .map((id) => _findNodeById(activeLayout, id))
@@ -159,18 +219,9 @@ class LayoutController extends GetxController {
     bool hasChildren = targets.any((node) => node.children.isNotEmpty);
 
     if (hasChildren) {
-      Get.defaultDialog(
-        title: 'Destructive Action Warning',
-        middleText:
-            'This will permanently overwrite the nested layouts inside the selected branches. Are you sure?',
-        textConfirm: 'Overwrite',
-        textCancel: 'Cancel',
-        confirmTextColor: Colors.white,
-        buttonColor: Colors.redAccent,
-        onConfirm: () {
-          Get.back(); // Close dialog
-          _executeSplit(targets, numberOfSplits, nodeType);
-        },
+      // NEW: Clean, centralized call!
+      ErrorHandler.showDestructiveWarning(
+        onConfirm: () => _executeSplit(targets, numberOfSplits, nodeType),
       );
     } else {
       _executeSplit(targets, numberOfSplits, nodeType);
@@ -202,8 +253,19 @@ class LayoutController extends GetxController {
       target.type = nodeType; // Transform the parent into a Row or Column
     }
 
-    // Important: Clear selections after a structural change to prevent orphaned IDs
-    selectedNodeIds.clear();
+    // FIX: If we only targeted ONE node, keep it selected and pop open the window!
+    if (targets.length == 1) {
+      selectedNodeIds = {targets.first.id};
+      if (Get.isRegistered<BaseWindowInteractions>(tag: 'Split')) {
+        Get.find<BaseWindowInteractions>(
+          tag: 'Split',
+        ).openSplitWindow(Size(Get.width, Get.height));
+      }
+    } else {
+      // If bulk editing, clear selections
+      selectedNodeIds.clear();
+    }
+
     saveState();
   }
 
@@ -211,11 +273,36 @@ class LayoutController extends GetxController {
   /// Tracks multiple selected nodes for bulk editing and synchronization.
   Set<String> selectedNodeIds = {};
 
+  /// Helper: Returns the node ONLY if exactly one node is selected.
+  LayoutNode? get singleSelectedNode {
+    if (selectedNodeIds.length == 1) {
+      return _findNodeById(activeLayout, selectedNodeIds.first);
+    }
+    return null; // Returns null if multiple or zero nodes are selected
+  }
+
+  /// Task 4 & 5: Exclusive Selection
+  /// Clears all other selections and selects ONLY this node.
+  void exclusiveSelectNode(String id) {
+    selectedNodeIds.clear();
+    selectedNodeIds.add(id);
+
+    update();
+    _checkBaselineSync();
+  }
+
   /// Task 1 & 3: Upgraded Selection with Ancestry Exclusivity
   void selectNode(String id) {
     // 1. Toggle off if already selected
     if (selectedNodeIds.contains(id)) {
       selectedNodeIds.remove(id);
+
+      // NEW: Close the split window if we deselected everything!
+      if (selectedNodeIds.isEmpty &&
+          Get.isRegistered<BaseWindowInteractions>(tag: 'Split')) {
+        Get.find<BaseWindowInteractions>(tag: 'Split').closeSplitWindow();
+      }
+
       update();
       return;
     }
@@ -238,18 +325,14 @@ class LayoutController extends GetxController {
     }
 
     if (hasConflict) {
-      Get.snackbar(
-        'Selection Blocked',
-        'Ancestry Conflict: Cannot select a parent and a child simultaneously.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
+      // NEW: Clean, centralized call!
+      ErrorHandler.showAncestryConflict();
       return;
     }
 
     // 3. Add to selection
     selectedNodeIds.add(id);
+
     update();
 
     // 4. TASK 3: Trigger Baseline Sync if needed
@@ -303,29 +386,12 @@ class LayoutController extends GetxController {
     );
 
     if (mismatch) {
-      // Prompt user to pick a baseline
-      Get.defaultDialog(
-        title: 'Baseline Synchronization',
-        middleText:
-            'The selected layers have conflicting mathematical properties. Please choose a baseline to sync them.',
-        content: Column(
-          children: selectedNodes
-              .map(
-                (node) => Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      _applyBaselineSync(node.id, selectedNodes);
-                      Get.back(); // Close dialog
-                    },
-                    child: Text(
-                      'Sync to: ${node.properties['layer_name'] ?? node.type}',
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
+      // NEW: Clean, centralized call!
+      ErrorHandler.showBaselineSyncDialog(
+        selectedNodes: selectedNodes,
+        onSyncSelected: (baselineId) {
+          _applyBaselineSync(baselineId, selectedNodes);
+        },
       );
     }
   }
@@ -354,6 +420,61 @@ class LayoutController extends GetxController {
     return null;
   }
 
+  /// Helper: Finds the parent of a specific node so we can access its siblings
+  LayoutNode? findParentOf(LayoutNode current, String targetId) {
+    for (var child in current.children) {
+      if (child.id == targetId) return current;
+      final found = findParentOf(
+        child,
+        targetId,
+      ); // Removed underscore here too
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  /// Task 1 & 2: Dynamic Flex Adjustment
+  /// Modifies a node's flex value and proportionally resizes its siblings.
+  void updateFlexValue(String id, int newFlex) {
+    // 1. Find the parent of the targeted node
+    final parent = findParentOf(activeLayout, id);
+    if (parent == null || parent.children.isEmpty) return;
+
+    // 2. Find the index of the target node among its siblings
+    final targetIndex = parent.children.indexWhere((child) => child.id == id);
+    if (targetIndex == -1) return;
+
+    // 3. Extract the current flex values of all siblings
+    List<int> currentFlexes = parent.children.map((child) {
+      return (child.properties['flex_value'] as int?) ?? 1000;
+    }).toList();
+
+    // 4. NEW: Figure out which siblings are locked so the math engine ignores them
+    Set<int> lockedIndices = {};
+    for (int i = 0; i < parent.children.length; i++) {
+      if (parent.children[i].properties['is_locked'] == true) {
+        lockedIndices.add(i);
+      }
+    }
+
+    // 5. Trigger the MathEngine to calculate proportional distribution
+    // FIXED: Parameter names now match math_engine.dart perfectly!
+    List<int> newFlexes = MathEngine.manualEdit(
+      currentSplits: currentFlexes, // Was currentFlexes
+      targetIndex: targetIndex,
+      targetValue: newFlex, // Was newFlex
+      lockedIndices: lockedIndices, // ADDED missing parameter
+    );
+
+    // 6. Apply the newly calculated flex values back to the JSON properties
+    for (int i = 0; i < parent.children.length; i++) {
+      parent.children[i].properties['flex_value'] = newFlexes[i];
+    }
+
+    // 7. Force the UI to redraw immediately at 60fps
+    update();
+  }
+
   /// Task 1 & 2: Export Engine
   /// Generates the code and copies the raw string directly to the device clipboard.
   void copyCodeToClipboard() {
@@ -365,24 +486,17 @@ class LayoutController extends GetxController {
     // 2. Access the device clipboard and set the text
     Clipboard.setData(ClipboardData(text: generatedCode))
         .then((_) {
-          // 3. Provide visual feedback that the action succeeded
-          Get.snackbar(
+          // NEW: Clean, centralized call!
+          ErrorHandler.showSuccess(
             'Code Exported!',
             'Production-ready Flutter code copied to clipboard.',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green.shade700,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 3),
-            icon: const Icon(Icons.check_circle, color: Colors.white),
           );
         })
         .catchError((error) {
-          Get.snackbar(
+          // NEW: Clean, centralized call!
+          ErrorHandler.showError(
             'Export Failed',
             'Could not access device clipboard.',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.redAccent,
-            colorText: Colors.white,
           );
         });
   }

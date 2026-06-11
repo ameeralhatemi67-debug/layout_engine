@@ -1,84 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import '../../controllers/layout_controller.dart';
+import '../../controllers/base_window_interactions.dart';
+import '../../controllers/window_manager.dart';
+import 'mhTools/main_holder_visual.dart';
 
 class MainHolder extends StatelessWidget {
   const MainHolder({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<LayoutController>();
-
-    return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-        child: Row(
-          mainAxisSize: MainAxisSize.min, // Shrinks the card to fit the buttons
-          children: [
-            // Undo Button (Listens reactively)
-            Obx(
-              () => IconButton(
-                icon: const Icon(Icons.undo),
-                color: controller.canUndo.value ? Colors.black : Colors.grey,
-                onPressed: controller.canUndo.value ? controller.undo : null,
-                tooltip: 'Undo',
-              ),
-            ),
-
-            // Redo Button (Listens reactively)
-            Obx(
-              () => IconButton(
-                icon: const Icon(Icons.redo),
-                color: controller.canRedo.value ? Colors.black : Colors.grey,
-                onPressed: controller.canRedo.value ? controller.redo : null,
-                tooltip: 'Redo',
-              ),
-            ),
-
-            const SizedBox(width: 8),
-            Container(
-              width: 1,
-              height: 24,
-              color: Colors.grey.shade300,
-            ), // Divider
-            const SizedBox(width: 8),
-
-            // --- NEW: LayerView / Wireframe Toggle Button ---
-            Obx(
-              () => IconButton(
-                icon: Icon(
-                  controller.isWireframeMode.value
-                      ? Icons.grid_on
-                      : Icons.grid_off,
-                ),
-                color: controller.isWireframeMode.value
-                    ? Colors.blueAccent
-                    : Colors.grey.shade600,
-                onPressed: controller.toggleWireframe,
-                tooltip: 'Toggle LayerView (Wireframe)',
-              ),
-            ),
-
-            const SizedBox(width: 8),
-            Container(
-              width: 1,
-              height: 24,
-              color: Colors.grey.shade300,
-            ), // Divider
-            const SizedBox(width: 8),
-
-            // Copy Code Button
-            IconButton(
-              icon: const Icon(Icons.code),
-              color: Colors.blueAccent,
-              onPressed: () => controller.copyCodeToClipboard(),
-              tooltip: 'Copy Code',
-            ),
-          ],
-        ),
-      ),
+    final interactions = Get.put(
+      BaseWindowInteractions()..setupAsToolbar(),
+      tag: 'Main',
     );
+
+    // 🚀 THE FIX: This forces the window to read the config coordinates!
+    interactions.applyDefaultPosition('Main', MediaQuery.of(context).size);
+
+    return Obx(() {
+      if (interactions.isHidden.value) {
+        return Positioned(
+          top: 16,
+          left: 16,
+          child: FloatingActionButton.small(
+            onPressed: interactions.restoreHolder,
+            backgroundColor: Colors.white,
+            elevation: 4,
+            child: SvgPicture.asset(
+              'assets/icons/MainHolder.svg',
+              width: 20,
+              height: 20,
+              colorFilter: const ColorFilter.mode(
+                Colors.black87,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+        );
+      }
+
+      return Positioned(
+        left: interactions.x.value,
+        top: interactions.y.value,
+        child: Listener(
+          onPointerDown: (_) => Get.find<WindowManager>().bringToFront('Main'),
+          child: GestureDetector(
+            onPanUpdate: interactions.onPanUpdate,
+            onPanEnd: (details) =>
+                interactions.onPanEnd(details, MediaQuery.of(context).size),
+            child: const MainHolderVisual(),
+          ),
+        ),
+      );
+    });
   }
 }

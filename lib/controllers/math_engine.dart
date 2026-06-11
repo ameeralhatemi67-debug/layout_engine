@@ -23,8 +23,8 @@ class MathEngine {
     return splits;
   }
 
-  /// Task 3: Proportional Redistribution (Manualedit)
-  /// Adjusts a target split and proportionally scales the remaining unlocked splits.
+  /// Task 3: Proportional Redistribution (ManualEdit)
+  /// Adjusts a target split and proportionally scales the remaining unlocked splits without integer bias.
   static List<int> manualEdit({
     required int targetIndex,
     required int targetValue,
@@ -34,16 +34,16 @@ class MathEngine {
     int n = currentSplits.length;
     if (n <= 1) return currentSplits;
 
-    // 1. Calculate Locked Space
-    int lockedSpace = 0;
-    for (int i in lockedIndices) {
-      if (i != targetIndex) lockedSpace += currentSplits[i];
-    }
-
-    // Identify unlocked siblings (excluding the target)
+    // 1. Identify Unlocked Siblings
     List<int> unlockedSiblings = [];
+    int lockedSpace = 0;
+
     for (int i = 0; i < n; i++) {
-      if (!lockedIndices.contains(i) && i != targetIndex) {
+      if (i == targetIndex) continue;
+
+      if (lockedIndices.contains(i)) {
+        lockedSpace += currentSplits[i];
+      } else {
         unlockedSiblings.add(i);
       }
     }
@@ -53,7 +53,7 @@ class MathEngine {
         totalSpace - lockedSpace - (unlockedSiblings.length * minSpace);
     int clampedTarget = targetValue > maxAllowed ? maxAllowed : targetValue;
     if (clampedTarget < minSpace)
-      clampedTarget = minSpace; // Target itself cannot be crushed
+      clampedTarget = minSpace; // Target cannot be crushed
 
     // 3. Current Unlocked Space (C_total)
     int cTotal = 0;
@@ -68,23 +68,44 @@ class MathEngine {
 
     if (unlockedSiblings.isEmpty) return newSplits;
 
-    // 5. Apply Proportional Ratio
+    // 5. Apply Proportional Ratio (Largest Remainder Method)
     int assignedSpace = 0;
-    for (int i in unlockedSiblings) {
-      // If previous C_total was 0 (edge case), distribute evenly, otherwise strictly proportional
-      int newValue = cTotal == 0
-          ? (aNew ~/ unlockedSiblings.length)
-          : (currentSplits[i] * aNew) ~/ cTotal;
+    Map<int, double> exactFractions =
+        {}; // Tracks who lost the most in rounding
 
-      newSplits[i] = newValue;
-      assignedSpace += newValue;
+    for (int i in unlockedSiblings) {
+      if (cTotal == 0) {
+        int val = aNew ~/ unlockedSiblings.length;
+        newSplits[i] = val;
+        assignedSpace += val;
+      } else {
+        // Calculate the exact decimal
+        double exact = (currentSplits[i] * aNew) / cTotal;
+        newSplits[i] = exact.floor(); // Round down safely
+        assignedSpace += newSplits[i];
+
+        // Save the decimal fraction that got chopped off
+        exactFractions[i] = exact - exact.floor();
+      }
     }
 
-    // 6. Handle the Redistribution Remainder
-    int rManual = aNew - assignedSpace;
-    if (rManual != 0 && unlockedSiblings.isNotEmpty) {
-      int middleUnlockedIndex = unlockedSiblings[unlockedSiblings.length ~/ 2];
-      newSplits[middleUnlockedIndex] += rManual;
+    // 6. Handle the Remainder Fairly
+    int remainder = aNew - assignedSpace;
+    if (remainder > 0 && cTotal > 0) {
+      // Sort the siblings so the one with the biggest chopped-off decimal is first
+      unlockedSiblings.sort(
+        (a, b) => exactFractions[b]!.compareTo(exactFractions[a]!),
+      );
+
+      // Hand out the remainder 1 unit at a time to whoever deserves it most
+      for (int i = 0; i < remainder; i++) {
+        newSplits[unlockedSiblings[i % unlockedSiblings.length]] += 1;
+      }
+    } else if (remainder > 0 && cTotal == 0) {
+      // Fallback if the space was entirely 0 previously
+      for (int i = 0; i < remainder; i++) {
+        newSplits[unlockedSiblings[i % unlockedSiblings.length]] += 1;
+      }
     }
 
     return newSplits;

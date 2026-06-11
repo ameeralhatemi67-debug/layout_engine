@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="13.149843mm"
+   height="10.569235mm"
+   viewBox="0 0 13.149843 10.569235"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+     id="defs1" /><g
+     id="layer1"
+     transform="translate(-365.55366,-155.37775)"><g
+       id="g257"
+       transform="matrix(0.74456159,0,0,0.74456159,-168.15765,-15.130103)"
+       style="fill:#191919;fill-opacity:1"><path
+         id="rect253"
+         style="opacity:1;fill:#191919;fill-opacity:1;stroke:none;stroke-width:0.251392;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;paint-order:markers stroke fill"
+         d="m 233.52425,-719.45531 2.1301,-0.27027 v -9.85314 c 0,-1.46242 1.17722,-2.63964 2.63963,-2.63964 h 0.13591 c 1.46242,0 2.63963,1.17722 2.63963,2.63964 v 1.97042 h 2.13011 v -2.0283 c 0,-2.6801 -2.15733,-4.83743 -4.83744,-4.83743 -2.6801,0 -4.83794,2.15733 -4.83794,4.83743 z"
+         transform="rotate(90)" /><g
+         id="g256"
+         transform="matrix(0.99999379,0,0,0.99999379,114.09411,2.2670652)"
+         style="fill:#191919;fill-opacity:1"><rect
+           style="opacity:1;fill:#191919;fill-opacity:1;stroke:none;stroke-width:0.0701728;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;paint-order:markers stroke fill"
+           id="rect255"
+           width="2.2820196"
+           height="8.1359377"
+           x="261.79272"
+           y="590.367"
+           ry="0.37397665"
+           transform="rotate(-45)" /><rect
+           style="opacity:1;fill:#191919;fill-opacity:1;stroke:none;stroke-width:0.0701728;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;paint-order:markers stroke fill"
+           id="rect256"
+           width="2.2820196"
+           height="8.1359377"
+           x="-592.64905"
+           y="261.79272"
+           ry="0.37397665"
+           transform="rotate(-135)" /></g><ellipse
+         style="fill:#191919;fill-opacity:1;fill-rule:evenodd;stroke-width:0.264583"
+         id="path256"
+         cx="727.60828"
+         cy="242.13457"
+         rx="1.01415"
+         ry="1.065055" /></g></g></svg>

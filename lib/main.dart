@@ -1,18 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'views/overlays/layer_window.dart';
+import 'package:layout_engine/controllers/base_window_interactions.dart';
+import 'package:layout_engine/controllers/window_manager.dart';
+
 import 'package:layout_engine/views/overlays/create_holder.dart';
 import 'package:layout_engine/views/overlays/main_holder.dart';
+import 'package:layout_engine/views/overlays/create_split_window.dart';
+import 'views/overlays/layer_window.dart';
 import 'controllers/layout_controller.dart';
 import 'services/storage_service.dart';
+
 import 'views/canvas/canvas_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
 
-  // Instantiate the controller here so it is available globally
+  // Instantiate the controllers here
   Get.put(LayoutController());
+  final winManager = Get.put(WindowManager());
+
+  // 🚀 OS REGISTRY: Register all your dynamic windows here!
+  // When you build new windows in the future, just add one line here.
+  winManager.registerWindow('Layer', const LayerWindow());
+  winManager.registerWindow('Split', const CreateSplitWindow());
+  winManager.registerWindow('Create', const CreateHolder());
+  winManager.registerWindow('Main', const MainHolder());
 
   runApp(const LayoutEngineApp());
 }
@@ -28,39 +41,26 @@ class LayoutEngineApp extends StatelessWidget {
       theme: ThemeData(scaffoldBackgroundColor: Colors.grey[200]),
       home: Scaffold(
         body: SafeArea(
-          child: Stack(
-            children: [
-              // 1. The rendered workspace (Bottom Layer)
-              const Padding(padding: EdgeInsets.all(16.0), child: CanvasView()),
-
-              // 2. The MainHolder (Top Center)
-              const Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 24.0),
-                  child: MainHolder(),
+          // FIX: Wrapping the MAIN Stack in Obx fixes the 0x0 dimension crash!
+          child: Obx(() {
+            final winManager = Get.find<WindowManager>();
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // 1. The rendered workspace (Bottom Layer - Gives the Stack its full screen size!)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CanvasView(),
                 ),
-              ),
 
-              // 3. The Matrix UI (Left Center)
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.only(left: 16.0),
-                  child: LayerWindow(),
-                ),
-              ),
+                // 2. The Visual Debugger Layer
+                const DebugSnapZonesOverlay(),
 
-              // 3. The CreateHolder (Bottom Center)
-              const Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 24.0),
-                  child: CreateHolder(),
-                ),
-              ),
-            ],
-          ),
+                // 3. Dynamic Windows injected straight into the master stack in perfect Z-Order!
+                ...winManager.orderedWindows,
+              ],
+            );
+          }),
         ),
       ),
     );
