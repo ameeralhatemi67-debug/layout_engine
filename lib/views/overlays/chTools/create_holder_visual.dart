@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:layout_engine/controllers/window_manager.dart';
 import '../../../controllers/layout_controller.dart';
 import 'package:layout_engine/controllers/base_window_interactions.dart';
 
@@ -99,11 +100,45 @@ class CreateHolderVisual extends StatelessWidget {
             onTap: () => Get.snackbar('Coming Soon', 'Image Widget'),
             tooltip: 'Add Image',
           ),
-          buildDivider(),
           buildIconBtn(
             icon: buildSvg('assets/icons/Square.svg'),
             onTap: () => Get.snackbar('Coming Soon', 'Square Widget'),
             tooltip: 'Add Square',
+          ),
+
+          // 🚀 NEW: The Padding Trigger
+          buildIconBtn(
+            icon: buildSvg('assets/icons/Padding.svg'),
+            onTap: () {
+              final selectedId = layoutCtrl.singleSelectedNode?.id;
+
+              // 1. Check if the selection is a valid leaf node
+              if (layoutCtrl.isPaddingValidTarget(selectedId)) {
+                // 2. Spawn the window with anti-overlap
+                if (Get.isRegistered<BaseWindowInteractions>(tag: 'Padding')) {
+                  final logic = Get.find<BaseWindowInteractions>(
+                    tag: 'Padding',
+                  );
+                  logic.openSplitWindow(MediaQuery.of(context).size);
+                  // Optional: if you have anti-overlap enabled for toolbars, trigger it here
+                }
+
+                // 3. Bring to front
+                if (Get.isRegistered<WindowManager>()) {
+                  Get.find<WindowManager>().bringToFront('Padding');
+                }
+              } else {
+                // Reject invalid targets
+                Get.snackbar(
+                  'Invalid Target',
+                  'Padding can only be applied to empty leaf nodes. Select a single empty container.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.redAccent,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            tooltip: 'Add Padding',
           ),
           buildIconBtn(
             icon: buildSvg('assets/icons/Triangle.svg'),

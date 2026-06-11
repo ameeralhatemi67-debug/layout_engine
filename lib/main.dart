@@ -6,6 +6,7 @@ import 'package:layout_engine/controllers/window_manager.dart';
 import 'package:layout_engine/views/overlays/create_holder.dart';
 import 'package:layout_engine/views/overlays/main_holder.dart';
 import 'package:layout_engine/views/overlays/create_split_window.dart';
+import 'package:layout_engine/views/overlays/padding_panel.dart';
 import 'views/overlays/layer_window.dart';
 import 'controllers/layout_controller.dart';
 import 'services/storage_service.dart';
@@ -25,6 +26,7 @@ void main() async {
   winManager.registerWindow('Layer', const LayerWindow());
   winManager.registerWindow('Split', const CreateSplitWindow());
   winManager.registerWindow('Create', const CreateHolder());
+  winManager.registerWindow('Padding', const PaddingPanel());
   winManager.registerWindow('Main', const MainHolder());
 
   runApp(const LayoutEngineApp());

@@ -110,4 +110,64 @@ class MathEngine {
 
     return newSplits;
   }
+
+  /// Task 2: Neighbor-Shift Redistribution (Equalizer OFF)
+  /// Adjusts a target split and steals/gives space ONLY to immediate cascading neighbors.
+  static List<int> neighborEdit({
+    required int targetIndex,
+    required int targetValue,
+    required List<int> currentSplits,
+    required Set<int> lockedIndices,
+  }) {
+    int n = currentSplits.length;
+    if (n <= 1) return currentSplits;
+
+    List<int> newSplits = List.from(currentSplits);
+    int difference = targetValue - currentSplits[targetIndex];
+    if (difference == 0) return newSplits;
+
+    // 1. Build the cascade order: Right neighbors first, then Left neighbors.
+    List<int> cascadeOrder = [];
+    for (int i = targetIndex + 1; i < n; i++) cascadeOrder.add(i);
+    for (int i = targetIndex - 1; i >= 0; i--) cascadeOrder.add(i);
+
+    int remainingToDistribute = -difference;
+
+    // 2. Cascade the difference through the available neighbors
+    for (int idx in cascadeOrder) {
+      if (remainingToDistribute == 0) break;
+      if (lockedIndices.contains(idx)) continue;
+
+      int currentVal = newSplits[idx];
+
+      if (remainingToDistribute < 0) {
+        // Target is growing, so this neighbor must shrink.
+        int maxSubtraction = currentVal - minSpace;
+        if (maxSubtraction > 0) {
+          int needToSubtract = -remainingToDistribute;
+          int amountToSubtract = needToSubtract > maxSubtraction
+              ? maxSubtraction
+              : needToSubtract;
+          newSplits[idx] -= amountToSubtract;
+          remainingToDistribute += amountToSubtract;
+        }
+      } else {
+        // Target is shrinking, so this neighbor grows.
+        newSplits[idx] += remainingToDistribute;
+        remainingToDistribute = 0;
+      }
+    }
+
+    // 3. Fallback Clamp
+    // If we hit limits (like minSpace on all unlocked neighbors),
+    // we must clamp the target's growth to whatever space we were actually able to steal.
+    if (remainingToDistribute != 0) {
+      int actualDifference = difference - (-remainingToDistribute);
+      newSplits[targetIndex] = currentSplits[targetIndex] + actualDifference;
+    } else {
+      newSplits[targetIndex] = targetValue;
+    }
+
+    return newSplits;
+  }
 }

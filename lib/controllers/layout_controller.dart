@@ -64,6 +64,59 @@ class LayoutController extends GetxController {
   }
 
   // --- SPLIT WINDOW STATES ---
+  /// Tracks the currently sub-selected split inside the Create Split Window
+  var activeSplitId = RxnString();
+
+  /// Sets or toggles the active split for sub-selection
+  void toggleActiveSplit(String id) {
+    if (activeSplitId.value == id) {
+      activeSplitId.value = null; // Deselect on double-tap
+    } else {
+      activeSplitId.value = id;
+    }
+    update();
+  }
+
+  /// Task 1: Visual Toggle State for the Equalizer
+  var isEqualizerOn = true.obs;
+
+  /// Toggles the Proportional (Equalizer) math logic
+  void toggleEqualizer() {
+    isEqualizerOn.value = !isEqualizerOn.value;
+    update();
+  }
+
+  /// Resets all children of the active layout split to perfectly equal sizes
+  void resetSplitsToEqual() {
+    final selected = singleSelectedNode;
+    if (selected == null) return;
+
+    // Target the parent container (whether we selected the parent or a child)
+    final isParent =
+        selected.type == 'RowNode' || selected.type == 'ColumnNode';
+    final parentNode = isParent
+        ? selected
+        : findParentOf(activeLayout, selected.id);
+
+    if (parentNode == null || parentNode.children.isEmpty) return;
+
+    // Apply the perfectly equal math
+    final equalFlexes = MathEngine.splitEdit(parentNode.children.length);
+    for (int i = 0; i < parentNode.children.length; i++) {
+      parentNode.children[i].properties['flex_value'] = equalFlexes[i];
+    }
+
+    saveState();
+    update();
+  }
+
+  /// Helper to check if a specific node is locked (Used for the lock.svg visual)
+  bool isNodeLocked(String? id) {
+    if (id == null) return false;
+    final node = _findNodeById(activeLayout, id);
+    return node?.properties['is_locked'] == true;
+  }
+
   /// Visual Toggle State for Canvas-level Hand Adjustments
   var isHandAdjustmentActive = false.obs;
 
@@ -83,6 +136,51 @@ class LayoutController extends GetxController {
       saveState(); // Saves the lock action to the Undo/Redo stack and Hive
       update(); // Forces UI to redraw
     }
+  }
+
+  /// Helper to check if a specific node is expanded
+  bool isNodeExpanded(String? id) {
+    if (id == null) return false;
+    final node = _findNodeById(activeLayout, id);
+    return node?.properties['is_expanded'] == true;
+  }
+
+  /// Toggles the 'is_expanded' property. Includes a destructive guard.
+  void toggleExpand(String nodeId) {
+    final node = _findNodeById(activeLayout, nodeId);
+    if (node == null) return;
+
+    bool currentExpand = node.properties['is_expanded'] == true;
+
+    // Guard: If it has children and we are trying to expand it, warn them!
+    if (node.children.isNotEmpty && !currentExpand) {
+      ErrorHandler.showDestructiveWarning(
+        onConfirm: () {
+          node.children.clear(); // Wipe children to make it a scrolling leaf
+          _executeToggleExpand(node, true);
+        },
+      );
+    } else {
+      _executeToggleExpand(node, !currentExpand);
+    }
+  }
+
+  void _executeToggleExpand(LayoutNode node, bool newState) {
+    node.properties['is_expanded'] = newState;
+
+    if (newState) {
+      // Initialize the internal canvas size to perfectly match the current wall size
+      node.properties['expanded_flex'] = node.properties['flex_value'];
+    } else {
+      // The Normalization Intercept you added previously
+      final parent = findParentOf(activeLayout, node.id);
+      if (parent != null && parent.children.isNotEmpty) {
+        _normalizeChildrenFlex(parent);
+      }
+    }
+
+    saveState();
+    update();
   }
 
   @override
@@ -226,6 +324,7 @@ class LayoutController extends GetxController {
     } else {
       _executeSplit(targets, numberOfSplits, nodeType);
     }
+    activeSplitId.value = null;
   }
 
   /// Executes the mathematical split on all targeted nodes
@@ -444,6 +543,30 @@ class LayoutController extends GetxController {
     final targetIndex = parent.children.indexWhere((child) => child.id == id);
     if (targetIndex == -1) return;
 
+    // THE EXPAND BYPASS FIX
+    if (parent.children[targetIndex].properties['is_expanded'] == true) {
+      // 1. Get the structural wall size so it cannot shrink smaller than its container
+      int baseFlex =
+          parent.children[targetIndex].properties['flex_value'] as int? ?? 1000;
+
+      // 2. Clamp the incoming flex between the base wall and the 10,000 limit (1000%)
+      int clampedFlex = newFlex.clamp(baseFlex, 10000);
+
+      // 3. Write the safe value
+      parent.children[targetIndex].properties['expanded_flex'] = clampedFlex;
+      update();
+      return;
+    }
+
+    // The Expand Engine Bypass
+    // If this node is expanded, it detaches from the 1000-unit limit.
+    // It simply takes the new flex value without stealing from siblings!
+    if (parent.children[targetIndex].properties['is_expanded'] == true) {
+      parent.children[targetIndex].properties['flex_value'] = newFlex;
+      update();
+      return;
+    }
+
     // 3. Extract the current flex values of all siblings
     List<int> currentFlexes = parent.children.map((child) {
       return (child.properties['flex_value'] as int?) ?? 1000;
@@ -457,14 +580,23 @@ class LayoutController extends GetxController {
       }
     }
 
-    // 5. Trigger the MathEngine to calculate proportional distribution
-    // FIXED: Parameter names now match math_engine.dart perfectly!
-    List<int> newFlexes = MathEngine.manualEdit(
-      currentSplits: currentFlexes, // Was currentFlexes
-      targetIndex: targetIndex,
-      targetValue: newFlex, // Was newFlex
-      lockedIndices: lockedIndices, // ADDED missing parameter
-    );
+    // 5. Trigger the MathEngine based on the Equalizer State
+    List<int> newFlexes;
+    if (isEqualizerOn.value) {
+      newFlexes = MathEngine.manualEdit(
+        currentSplits: currentFlexes,
+        targetIndex: targetIndex,
+        targetValue: newFlex,
+        lockedIndices: lockedIndices,
+      );
+    } else {
+      newFlexes = MathEngine.neighborEdit(
+        currentSplits: currentFlexes,
+        targetIndex: targetIndex,
+        targetValue: newFlex,
+        lockedIndices: lockedIndices,
+      );
+    }
 
     // 6. Apply the newly calculated flex values back to the JSON properties
     for (int i = 0; i < parent.children.length; i++) {
@@ -473,6 +605,143 @@ class LayoutController extends GetxController {
 
     // 7. Force the UI to redraw immediately at 60fps
     update();
+  }
+
+  /// The Safety Net: Forces a parent's children back to exactly 1000 units
+  /// using Proportional Normalization and the Largest Remainder method.
+  void _normalizeChildrenFlex(LayoutNode parent) {
+    int totalFlexSum = 0;
+
+    // 1. Find the bloated total sum
+    for (var child in parent.children) {
+      totalFlexSum += (child.properties['flex_value'] as int?) ?? 1000;
+    }
+
+    // If it's already perfectly 1000 (or 0), do nothing.
+    if (totalFlexSum == 0 || totalFlexSum == 1000) return;
+
+    int assignedSpace = 0;
+    Map<int, double> exactFractions = {};
+    List<int> newFlexes = List.filled(parent.children.length, 0);
+
+    // 2. Scale everyone down proportionally to fit inside 1000
+    for (int i = 0; i < parent.children.length; i++) {
+      int currentFlex =
+          (parent.children[i].properties['flex_value'] as int?) ?? 1000;
+
+      double exact = (currentFlex * 1000) / totalFlexSum;
+      newFlexes[i] = exact.floor(); // Round down safely
+      assignedSpace += newFlexes[i];
+
+      // Track who lost the most space to rounding
+      exactFractions[i] = exact - newFlexes[i];
+    }
+
+    // 3. Hand out the remaining integer points fairly
+    int remainder = 1000 - assignedSpace;
+    if (remainder > 0) {
+      List<int> sortedIndices = List.generate(parent.children.length, (i) => i);
+      sortedIndices.sort(
+        (a, b) => exactFractions[b]!.compareTo(exactFractions[a]!),
+      );
+
+      for (int i = 0; i < remainder; i++) {
+        newFlexes[sortedIndices[i % sortedIndices.length]] += 1;
+      }
+    }
+
+    // 4. Apply the strictly normalized values back to the JSON tree
+    for (int i = 0; i < parent.children.length; i++) {
+      parent.children[i].properties['flex_value'] = newFlexes[i];
+    }
+  }
+
+  // ===========================================================================
+  // 🚀 PADDING ENGINE (PHASE 1)
+  // ===========================================================================
+
+  /// Guard: Ensures padding is only applied to empty leaf nodes
+  bool isPaddingValidTarget(String? id) {
+    if (id == null) return false;
+    final node = _findNodeById(activeLayout, id);
+    return node != null && node.children.isEmpty;
+  }
+
+  /// Boundary Engine: Global Slider
+  /// Adjusts all selected sides simultaneously. Caps the max value if opposites are selected.
+  void updatePaddingGlobal(String id, List<String> activeSides, int newValue) {
+    final node = _findNodeById(activeLayout, id);
+    if (node == null || node.children.isNotEmpty) return;
+
+    int maxLimit = 100;
+
+    // MATHEMATICAL GUARD: If both Top and Bottom are selected, they cannot exceed 50% each
+    if (activeSides.contains('top') && activeSides.contains('bottom'))
+      maxLimit = 50;
+
+    // MATHEMATICAL GUARD: If both Left and Right are selected, they cannot exceed 50% each
+    if (activeSides.contains('left') && activeSides.contains('right')) {
+      if (50 < maxLimit) maxLimit = 50;
+    }
+
+    int safeValue = newValue.clamp(0, maxLimit);
+
+    Map<String, dynamic> padding = Map<String, dynamic>.from(
+      node.properties['padding'],
+    );
+    if (activeSides.contains('top')) padding['top'] = safeValue;
+    if (activeSides.contains('bottom')) padding['bottom'] = safeValue;
+    if (activeSides.contains('left')) padding['left'] = safeValue;
+    if (activeSides.contains('right')) padding['right'] = safeValue;
+
+    node.properties['padding'] = padding;
+    update(); // Redraws UI immediately (No saveState here to prevent Undo flooding)
+  }
+
+  /// Boundary Engine: Manual Slider Adjustments
+  /// Enforces that Opposite Sides (L+R, T+B) dynamically clamp each other below 100%.
+  void updatePaddingManual(String id, String side, int newValue) {
+    final node = _findNodeById(activeLayout, id);
+    if (node == null || node.children.isNotEmpty) return;
+
+    Map<String, dynamic> padding = Map<String, dynamic>.from(
+      node.properties['padding'],
+    );
+
+    int top = padding['top'] ?? 0;
+    int bottom = padding['bottom'] ?? 0;
+    int left = padding['left'] ?? 0;
+    int right = padding['right'] ?? 0;
+
+    // MATHEMATICAL GUARD: Dynamically calculate the maximum space left based on the opposite side
+    if (side == 'top') {
+      top = newValue.clamp(0, 100 - bottom);
+    } else if (side == 'bottom') {
+      bottom = newValue.clamp(0, 100 - top);
+    } else if (side == 'left') {
+      left = newValue.clamp(0, 100 - right);
+    } else if (side == 'right') {
+      right = newValue.clamp(0, 100 - left);
+    }
+
+    node.properties['padding'] = {
+      'top': top,
+      'bottom': bottom,
+      'left': left,
+      'right': right,
+    };
+
+    update(); // Redraws UI immediately (No saveState here to prevent Undo flooding)
+  }
+
+  /// Updates the canvas padding theme color
+  void updatePaddingColor(String id, String colorName) {
+    final node = _findNodeById(activeLayout, id);
+    if (node != null && node.children.isEmpty) {
+      node.properties['padding_color'] = colorName;
+      saveState(); // Colors are single clicks, so we CAN save directly to history
+      update();
+    }
   }
 
   /// Task 1 & 2: Export Engine

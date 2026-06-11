@@ -36,25 +36,47 @@ class CreateSplitWindowVisual extends StatelessWidget {
           final isHorizontal = interactions.isHorizontal.value;
           final scale = interactions.windowScale; // Uniform scaling factor
 
-          // Helper: Scaled Icon Builder
+          // Helper: Scaled Icon Builder (Upgraded for visual disabled states)
           Widget buildIcon(
             String asset,
             VoidCallback onTap, {
+            VoidCallback? onDoubleTap,
             bool isActive = false,
+            bool isEnabled = true, // 🚀 NEW: Controls the greyed-out state
           }) {
-            return IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              icon: SvgPicture.asset(
-                asset,
-                width: 28 * scale, // Dynamically scales icon size
-                height: 28 * scale,
-                colorFilter: ColorFilter.mode(
-                  isActive ? Colors.blueAccent : Colors.black87,
-                  BlendMode.srcIn,
+            return InkWell(
+              // If disabled, intercept the tap and show the snackbar immediately
+              onTap: isEnabled
+                  ? onTap
+                  : () {
+                      Get.snackbar(
+                        'Select a Split',
+                        'Double-click a percentage below to select it first.',
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                    },
+              onDoubleTap: onDoubleTap,
+              customBorder: const CircleBorder(),
+              child: Container(
+                constraints: BoxConstraints(
+                  minWidth: 40 * scale,
+                  minHeight: 40 * scale,
+                ),
+                alignment: Alignment.center,
+                padding: EdgeInsets.all(4.0 * scale),
+                child: SvgPicture.asset(
+                  asset,
+                  width: 28 * scale,
+                  height: 28 * scale,
+                  colorFilter: ColorFilter.mode(
+                    // Logic to show Grey (Disabled), Blue (Active), or Black (Enabled)
+                    !isEnabled
+                        ? Colors.grey.withOpacity(0.4)
+                        : (isActive ? Colors.blueAccent : Colors.black87),
+                    BlendMode.srcIn,
+                  ),
                 ),
               ),
-              onPressed: onTap,
             );
           }
 
@@ -84,25 +106,40 @@ class CreateSplitWindowVisual extends StatelessWidget {
                     Expanded(
                       flex: 1,
                       child: buildIcon(
-                        'assets/icons/Dragger.svg',
-                        layoutCtrl.toggleHandAdjustment,
-                        isActive: layoutCtrl.isHandAdjustmentActive.value,
+                        'assets/icons/Expand.svg',
+                        () => layoutCtrl.toggleExpand(
+                          layoutCtrl.activeSplitId.value!,
+                        ),
+                        isActive: layoutCtrl.isNodeExpanded(
+                          layoutCtrl.activeSplitId.value,
+                        ),
+                        // 🚀 NEW: Only awake if a split is selected
+                        isEnabled: layoutCtrl.activeSplitId.value != null,
                       ),
                     ),
                     Expanded(
                       flex: 1,
                       child: buildIcon(
                         'assets/icons/lock.svg',
-                        () => layoutCtrl.toggleLock(selected.id),
-                        isActive: selected.properties['is_locked'] == true,
+                        () => layoutCtrl.toggleLock(
+                          layoutCtrl.activeSplitId.value!,
+                        ),
+                        isActive: layoutCtrl.isNodeLocked(
+                          layoutCtrl.activeSplitId.value,
+                        ),
+                        // 🚀 NEW: Only awake if a split is selected
+                        isEnabled: layoutCtrl.activeSplitId.value != null,
                       ),
                     ),
                     Expanded(
                       flex: 1,
                       child: buildIcon(
                         'assets/icons/SpiltEdit.svg',
-                        () {},
-                        isActive: true,
+                        layoutCtrl
+                            .toggleEqualizer, // Single Tap: Toggles Equalizer
+                        onDoubleTap: layoutCtrl
+                            .resetSplitsToEqual, // Double Tap: Resets All
+                        isActive: layoutCtrl.isEqualizerOn.value,
                       ),
                     ),
                     // FIX: Reduced empty space to 1, gave cutCounter flex 2
@@ -134,24 +171,39 @@ class CreateSplitWindowVisual extends StatelessWidget {
                       flex: 1,
                       child: buildIcon(
                         'assets/icons/SpiltEdit.svg',
-                        () {},
-                        isActive: true,
+                        layoutCtrl
+                            .toggleEqualizer, // Single Tap: Toggles Equalizer
+                        onDoubleTap: layoutCtrl
+                            .resetSplitsToEqual, // Double Tap: Resets All
+                        isActive: layoutCtrl.isEqualizerOn.value,
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: buildIcon(
+                        'assets/icons/Expand.svg',
+                        () => layoutCtrl.toggleExpand(
+                          layoutCtrl.activeSplitId.value!,
+                        ),
+                        isActive: layoutCtrl.isNodeExpanded(
+                          layoutCtrl.activeSplitId.value,
+                        ),
+                        // 🚀 NEW: Only awake if a split is selected
+                        isEnabled: layoutCtrl.activeSplitId.value != null,
                       ),
                     ),
                     Expanded(
                       flex: 1,
                       child: buildIcon(
                         'assets/icons/lock.svg',
-                        () => layoutCtrl.toggleLock(selected.id),
-                        isActive: selected.properties['is_locked'] == true,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 1,
-                      child: buildIcon(
-                        'assets/icons/Dragger.svg',
-                        layoutCtrl.toggleHandAdjustment,
-                        isActive: layoutCtrl.isHandAdjustmentActive.value,
+                        () => layoutCtrl.toggleLock(
+                          layoutCtrl.activeSplitId.value!,
+                        ),
+                        isActive: layoutCtrl.isNodeLocked(
+                          layoutCtrl.activeSplitId.value,
+                        ),
+                        // 🚀 NEW: Only awake if a split is selected
+                        isEnabled: layoutCtrl.activeSplitId.value != null,
                       ),
                     ),
                   ],
@@ -160,14 +212,41 @@ class CreateSplitWindowVisual extends StatelessWidget {
           // 3. The Adaptive Percentages Row
           List<Widget> percentageFields = [];
           for (int i = 0; i < children.length; i++) {
+            final child = children[i];
+            final isSubSelected = layoutCtrl.activeSplitId.value == child.id;
+            // 🚀 NEW: Fetch the states directly from the JSON
+            final isLocked = child.properties['is_locked'] == true;
+            final isExpanded = child.properties['is_expanded'] == true;
+
             percentageFields.add(
-              PercentageDragField(
-                rawFlexValue:
-                    children[i].properties['flex_value'] as int? ?? 1000,
-                onChanged: (newFlex) =>
-                    layoutCtrl.updateFlexValue(children[i].id, newFlex),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onDoubleTap: () => layoutCtrl.toggleActiveSplit(child.id),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: isSubSelected
+                          ? Colors.lightBlueAccent
+                          : Colors.transparent,
+                      width: 2.0 * scale,
+                    ),
+                    borderRadius: BorderRadius.circular(6 * scale),
+                  ),
+                  padding: EdgeInsets.all(2.0 * scale),
+                  // 🚀 REVERTED: Back to just the clean drag field!
+                  child: PercentageDragField(
+                    rawFlexValue: child.properties['is_expanded'] == true
+                        ? (child.properties['expanded_flex'] as int? ??
+                              child.properties['flex_value'] as int? ??
+                              1000)
+                        : (child.properties['flex_value'] as int? ?? 1000),
+                    onChanged: (newFlex) =>
+                        layoutCtrl.updateFlexValue(child.id, newFlex),
+                  ),
+                ),
               ),
             );
+
             if (i < children.length - 1) {
               percentageFields.add(
                 isHorizontal
@@ -183,7 +262,6 @@ class CreateSplitWindowVisual extends StatelessWidget {
                         ),
                       )
                     : Container(
-                        // NEW: Draws the horizontal separator lines seen in your vertical design!
                         margin: EdgeInsets.symmetric(vertical: 6.0 * scale),
                         height: 1.5 * scale,
                         width: 32.0 * scale,
@@ -196,7 +274,7 @@ class CreateSplitWindowVisual extends StatelessWidget {
           // 4. Render Shell
           return Card(
             elevation: 8,
-            color: const Color(0xFFF2F2F2),
+            color: const Color.fromARGB(255, 247, 244, 255),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16 * scale),
             ),

@@ -29,6 +29,7 @@ class LayoutNode {
     // Inject Checkpoint 7 defaults if they do not exist yet
     base['padding'] =
         base['padding'] ?? {'top': 0, 'bottom': 0, 'left': 0, 'right': 0};
+    base['padding_color'] = base['padding_color'] ?? 'light_orange';
     base['alignment'] = base['alignment'] ?? 'center';
     // base['locked_size'] remains null until explicitly set by a user
 

@@ -14,6 +14,12 @@ class WindowConfig {
       case 'Split':
         // Middle Right Bottom (Assuming 340px width and 120px height)
         return Offset(screenSize.width - 160, screenSize.height - 360);
+      case 'Padding':
+        // Spawns slightly offset from the center
+        return Offset(
+          (screenSize.width / 2) - 100,
+          (screenSize.height / 2) - 150,
+        );
       default:
         return const Offset(40, 40);
     }
@@ -30,6 +36,8 @@ class WindowConfig {
         return false; // Vertical (Matrix is always vertical)
       case 'Split':
         return true; // Horizontal
+      case 'Padding':
+        return true;
       default:
         return true;
     }
