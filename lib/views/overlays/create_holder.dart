@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:layout_engine/controllers/window_manager.dart';
-import '../../controllers/base_window_interactions.dart';
+import 'package:layout_engine/controllers/base_window_interactions.dart';
 import 'chTools/create_holder_visual.dart';
 
 class CreateHolder extends StatelessWidget {
@@ -12,6 +12,10 @@ class CreateHolder extends StatelessWidget {
     final interactions = Get.put(
       BaseWindowInteractions()
         ..setupAsToolbar(length: 360.0)
+        ..exactTopSnapX =
+            80.0 // 🚀 NEW: Docks 80px from the left
+        ..exactBottomSnapX =
+            80.0 // 🚀 NEW: Docks 80px from the left
         ..isHidden.value = true,
       tag: 'Create',
     );

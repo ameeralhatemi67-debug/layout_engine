@@ -2,25 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:layout_engine/controllers/window_config.dart';
 
-enum ScreenEdge { none, top, bottom, left, right }
-
-/// A unified physics and interaction engine for ALL floating windows.
 class BaseWindowInteractions extends GetxController {
-  // ===========================================================================
-  // 1. CORE STATE
-  // ===========================================================================
   var x = 0.0.obs;
   var y = 0.0.obs;
   var isHorizontal = true.obs;
   var isHidden = false.obs;
   var isOpen = true.obs;
-  bool _hasInitialized = false; // Prevents overwriting coordinates after boot
+  bool _hasInitialized = false;
 
-  /// Safely injects the default location on the very first boot
   void applyDefaultPosition(String tag, Size screenSize) {
-    // 🚀 THE FIX: Abort if Flutter hasn't calculated the real screen size yet!
     if (screenSize.width <= 0 || screenSize.height <= 0) return;
-
     if (!_hasInitialized) {
       Offset pos = WindowConfig.getDefaultPosition(tag, screenSize);
       x.value = pos.dx;
@@ -30,9 +21,6 @@ class BaseWindowInteractions extends GetxController {
     }
   }
 
-  // ===========================================================================
-  // 2. DIMENSIONS
-  // ===========================================================================
   double windowScale = 1.0;
   double widthH = 100.0;
   double heightH = 100.0;
@@ -40,20 +28,52 @@ class BaseWindowInteractions extends GetxController {
   double heightV = 100.0;
   double closedSize = 60.0;
 
-  // ===========================================================================
-  // 3. CONFIGURATION TWEAKS (Adjust manually until satisfied)
-  // ===========================================================================
-  double snapZoneThickness =
-      30.0; // EDIT THIS: Make it smaller (e.g., 15.0) to give more dragging room!
-  var showDebugSnap = false.obs; // Toggles the red striped visual debugger
-  double edgePadding = 12.0;
-  double snapThreshold = 0.5; // 50% collision rule!
-  double drawerVisibleRatio = 0.2; // 20% must remain visible
+  static const double defaultDetectDistance = 50.0;
+  static const double defaultED = 12.0; // Edge Distance (Padding)
+  static const double defaultLWH = 200.0; // Line Width Horizontal
+  static const double defaultLWV = 300.0; // Line Width Vertical
+  static const double defaultLP = 15.0; // Line Position (Offset)
+
+  // Global Edge Padding
+  var detectDistance = defaultDetectDistance.obs;
+
+  // Individual Distances from the Edge (ED)
+  var topPadding = defaultED.obs;
+  var bottomPadding = defaultED.obs;
+  var leftPadding = defaultED.obs;
+  var rightPadding = defaultED.obs;
+
+  // Visual Target Line Lengths (LW)
+  var topLength = defaultLWH.obs;
+  var bottomLength = defaultLWH.obs;
+  var leftLength = defaultLWV.obs;
+  var rightLength = defaultLWV.obs;
+
+  // =======================================================
+  // 🚀 NEW: LINE POSITIONS / LP (Task 1.2)
+  // =======================================================
+  var topPosition = defaultLP.obs;
+  var bottomPosition = defaultLP.obs;
+  var leftPosition = defaultLP.obs;
+  var rightPosition = defaultLP.obs;
+
+  // 🚀 NEW: Individual Line Positions (LP translations along parallel axes)
+  var leftLinePos = 0.0.obs;
+  var rightLinePos = 0.0.obs;
+  var topLinePos = 0.0.obs;
+  var bottomLinePos = 0.0.obs;
+
+  // The Two Visual Debuggers
+  var showDebugSnap = false.obs;
+  var showDetectionZones = false.obs;
+
+  double snapThreshold = 0.5;
+  double drawerVisibleRatio = 0.2;
   double hideVisibleThreshold = 40.0;
 
-  // ===========================================================================
-  // 4. FEATURE FLAGS
-  // ===========================================================================
+  double? exactTopSnapX;
+  double? exactBottomSnapX;
+
   bool enableSnapping = false;
   bool enableOrientationChange = false;
   bool enableStrictBoundaryClamp = false;
@@ -62,11 +82,6 @@ class BaseWindowInteractions extends GetxController {
   bool enableKeyboardAvoidance = false;
   bool enableMinimize = false;
 
-  // ===========================================================================
-  // WINDOW CONFIGURATORS (The Setup Methods)
-  // ===========================================================================
-
-  /// Configures the engine for Toolbars (MainHolder & CreateHolder)
   void setupAsToolbar({double length = 280.0}) {
     widthH = length;
     heightH = 60.0;
@@ -76,63 +91,65 @@ class BaseWindowInteractions extends GetxController {
 
     enableSnapping = true;
     enableOrientationChange = true;
-    enableStrictBoundaryClamp = true;
-    enableOffScreenHiding = true;
+    enableStrictBoundaryClamp = false;
+    enableOffScreenHiding = false; // 🚀 DISABLED FOR TESTING AS REQUESTED!
     enableMinimize = true;
-
     enableDrawerBleed = false;
     enableKeyboardAvoidance = false;
   }
 
-  /// Configures the engine for the Split Editor Window
+  void resetSnappingDefaults() {
+    detectDistance.value = defaultDetectDistance;
+
+    topPadding.value = defaultED;
+    bottomPadding.value = defaultED;
+    leftPadding.value = defaultED;
+    rightPadding.value = defaultED;
+
+    topLength.value = defaultLWH;
+    bottomLength.value = defaultLWH;
+    leftLength.value = defaultLWV;
+    rightLength.value = defaultLWV;
+
+    topPosition.value = defaultLP;
+    bottomPosition.value = defaultLP;
+    leftPosition.value = defaultLP;
+    rightPosition.value = defaultLP;
+  }
+
   void setupAsSplitWindow({double scale = 1.0}) {
     windowScale = scale;
-
-    // Strict 17:6 Ratio modified by the scale factor
     widthH = 340.0 * scale;
     heightH = 120.0 * scale;
     widthV = 120.0 * scale;
     heightV = 380.0 * scale;
-
-    isOpen.value = false; // Starts hidden
-
+    isOpen.value = false;
     enableSnapping = true;
     enableOrientationChange = true;
     enableDrawerBleed = true;
     enableKeyboardAvoidance = true;
-
     enableStrictBoundaryClamp = false;
     enableOffScreenHiding = false;
     enableMinimize = false;
   }
 
-  /// Configures the engine for the Floating Layer Matrix
   void setupAsLayerWindow({double width = 220.0, double height = 400.0}) {
     widthH = width;
     heightH = height;
     widthV = width;
     heightV = height;
-
     isOpen.value = true;
     isHidden.value = false;
-    isHorizontal.value = false; // Strictly vertical
-
-    // The Specific Physics requested:
-    enableDrawerBleed = true; // Enables the 80% off-screen hide
-    enableSnapping = false; // Free-floating
-    enableOrientationChange = false; // Will never rotate to horizontal
-
+    isHorizontal.value = false;
+    enableDrawerBleed = true;
+    enableSnapping = false;
+    enableOrientationChange = false;
     enableStrictBoundaryClamp = false;
     enableOffScreenHiding = false;
     enableMinimize = false;
     enableKeyboardAvoidance = false;
   }
 
-  // ===========================================================================
-  // SPECIFIC UX ACTIONS
-  // ===========================================================================
-
-  // --- Toolbar Actions ---
   void toggleOpen(Size screenSize) {
     isOpen.value = !isOpen.value;
     if (isOpen.value) {
@@ -150,26 +167,14 @@ class BaseWindowInteractions extends GetxController {
 
   void openSplitWindow(Size screenSize) {
     isOpen.value = true;
-    List<Rect> activeWindows = getActiveWindowRects('Split');
-    spawnWithAntiOverlap(screenSize, activeWindows, 'Split'); // Passed tag
+    spawnWithAntiOverlap(screenSize, getActiveWindowRects('Split'), 'Split');
   }
 
-  void closeSplitWindow() {
-    isOpen.value = false;
-  }
+  void closeSplitWindow() => isOpen.value = false;
 
-  void updateDimensions(int numberOfSplits) {
-    widthH = 340.0;
-    heightH = 120.0;
-    widthV = 120.0;
-    heightV = 340.0;
-  }
-
-  /// NEW HELPER: Scans the OS and returns the exact Rect (hit-box) of every open window!
   List<Rect> getActiveWindowRects(String excludeTag) {
     List<String> knownTags = ['Main', 'Create', 'Split', 'Layer'];
     List<Rect> rects = [];
-
     for (String tag in knownTags) {
       if (tag == excludeTag) continue;
       if (Get.isRegistered<BaseWindowInteractions>(tag: tag)) {
@@ -184,17 +189,14 @@ class BaseWindowInteractions extends GetxController {
     return rects;
   }
 
-  // --- Smart Window Spawning ---
   void spawnWithAntiOverlap(
     Size screenSize,
     List<Rect> openWindows,
     String tag,
   ) {
-    // 1. Get Defaults from Central Config
     Offset defaultPos = WindowConfig.getDefaultPosition(tag, screenSize);
     bool defaultIsHorizontal = WindowConfig.getDefaultOrientation(tag);
 
-    // HELPER: Attempts to cascade and fit the window without colliding
     bool tryFit(bool testHorizontal) {
       isHorizontal.value = testHorizontal;
       double w = testHorizontal ? widthH : widthV;
@@ -202,14 +204,9 @@ class BaseWindowInteractions extends GetxController {
       double shiftOffset = 30.0;
 
       for (int i = 0; i < 15; i++) {
-        // SMART CASCADE: If default is on the right side of the screen, cascade LEFT and DOWN
-        // If it is on the left side, cascade RIGHT and DOWN
         double dirX = (defaultPos.dx > screenSize.width / 2) ? -1 : 1;
-
         double proposedX = defaultPos.dx + (i * shiftOffset * dirX);
         double proposedY = defaultPos.dy + (i * shiftOffset);
-
-        // Keep it strictly inside the screen bounds
         if (proposedX < 16.0) proposedX = 16.0;
         if (proposedX + w > screenSize.width)
           proposedX = screenSize.width - w - 16.0;
@@ -217,36 +214,21 @@ class BaseWindowInteractions extends GetxController {
           proposedY = screenSize.height - h - 16.0;
 
         Rect proposedRect = Rect.fromLTWH(proposedX, proposedY, w, h);
-        bool hasCollision = openWindows.any(
-          (win) => win.overlaps(proposedRect),
-        );
-
-        if (!hasCollision) {
+        if (!openWindows.any((win) => win.overlaps(proposedRect))) {
           x.value = proposedX;
           y.value = proposedY;
-          return true; // Success!
+          return true;
         }
       }
-      return false; // Failed to fit
+      return false;
     }
 
-    // 2. Attempt 1: Try to fit using the preferred Default Orientation
     if (tryFit(defaultIsHorizontal)) return;
-
-    // 3. Attempt 2: Try the Alternate Orientation (if the window supports it)
-    if (enableOrientationChange) {
-      if (tryFit(!defaultIsHorizontal)) return;
-    }
-
-    // 4. Fallback: No space found anywhere. Force it exactly to its default position and orientation!
+    if (enableOrientationChange && tryFit(!defaultIsHorizontal)) return;
     isHorizontal.value = defaultIsHorizontal;
     x.value = defaultPos.dx;
     y.value = defaultPos.dy;
   }
-
-  // ===========================================================================
-  // INTERACTION MODULES (The Physics)
-  // ===========================================================================
 
   void onPanUpdate(DragUpdateDetails details) {
     x.value += details.delta.dx;
@@ -254,249 +236,179 @@ class BaseWindowInteractions extends GetxController {
   }
 
   void onPanEnd(DragEndDetails details, Size screenSize) {
-    double currentW = (enableMinimize && !isOpen.value)
-        ? closedSize
-        : (isHorizontal.value ? widthH : widthV);
-    double currentH = (enableMinimize && !isOpen.value)
-        ? closedSize
-        : (isHorizontal.value ? heightH : heightV);
+    double safeBottom = screenSize.height - Get.mediaQuery.padding.bottom;
+    double currentW = isHorizontal.value ? widthH : widthV;
+    double currentH = isHorizontal.value ? heightH : heightV;
 
-    if (enableOffScreenHiding) {
-      if (_checkOffScreenHide(screenSize, currentW, currentH)) {
-        isHidden.value = true;
+    // =========================================================================
+    // 🚀 1. THE HITBOX PHYSICS ENGINE (For Main & Create Holders)
+    // =========================================================================
+    if (enableMinimize) {
+      double hbSize = 48.0; // The physical size of the Drag Handle square
+
+      // Calculate the absolute center of the Drag Handle
+      double cx = x.value + (hbSize / 2);
+      double cy = y.value + (hbSize / 2);
+
+      // Outward Detection: If dragged completely off-screen, force it back!
+      if (cx < 0) cx = 0;
+      if (cx > screenSize.width) cx = screenSize.width;
+      if (cy < 0) cy = 0;
+      if (cy > safeBottom) cy = safeBottom;
+
+      // 🚀 Global Detection Logic (Task 4.1: Hitbox Segment Intersection)
+      // Checks if the drag handle is in the detection zone AND physically intersects the [LP, LP + LW] segment
+      bool snapR =
+          cx > screenSize.width - detectDistance.value &&
+          (y.value + hbSize >= rightPosition.value &&
+              y.value <= rightPosition.value + rightLength.value);
+
+      bool snapL =
+          cx < detectDistance.value &&
+          (y.value + hbSize >= leftPosition.value &&
+              y.value <= leftPosition.value + leftLength.value);
+
+      bool snapT =
+          cy < detectDistance.value &&
+          (x.value + hbSize >= topPosition.value &&
+              x.value <= topPosition.value + topLength.value);
+
+      bool snapB =
+          cy > safeBottom - detectDistance.value &&
+          (x.value + hbSize >= bottomPosition.value &&
+              x.value <= bottomPosition.value + bottomLength.value);
+
+      if (snapR || snapL || snapT || snapB) {
+        if (snapR) {
+          x.value = screenSize.width - currentW - rightPadding.value;
+          y.value = rightPosition.value; // 🚀 NEW: Snap to LP Offset
+          if (enableOrientationChange) isHorizontal.value = false;
+        } else if (snapL) {
+          x.value = leftPadding.value;
+          y.value = leftPosition.value; // 🚀 NEW: Snap to LP Offset
+          if (enableOrientationChange) isHorizontal.value = false;
+        } else if (snapT) {
+          y.value = topPadding.value;
+          // 🚀 NEW: Replaced the static center-screen math with LP Offset
+          x.value = exactTopSnapX ?? topPosition.value;
+          if (enableOrientationChange) isHorizontal.value = true;
+        } else if (snapB) {
+          y.value = safeBottom - currentH - bottomPadding.value;
+          // 🚀 NEW: Replaced the static center-screen math with LP Offset
+          x.value = exactBottomSnapX ?? bottomPosition.value;
+          if (enableOrientationChange) isHorizontal.value = true;
+        }
+
+        currentW = isHorizontal.value ? widthH : widthV;
+        currentH = isHorizontal.value ? heightH : heightV;
+
+        // 🚀 THE BEAUTY OF YOUR SYSTEM:
+        // This existing clamping code below will naturally "eat" the window
+        // if the user slides the LP offset too far past the screen boundaries!
+        if (snapR || snapL) {
+          if (y.value < topPadding.value) {
+            y.value = topPadding.value;
+          }
+          if (y.value > safeBottom - currentH - bottomPadding.value) {
+            y.value = safeBottom - currentH - bottomPadding.value;
+          }
+        }
         return;
       }
     }
 
-    if (enableSnapping && (!enableMinimize || isOpen.value)) {
-      Map<ScreenEdge, double> distances = _detectBoundaries(
-        screenSize,
-        currentW,
-        currentH,
-      );
-      ScreenEdge edgeToSnap = _calculateSnapEdge(distances, currentW, currentH);
+    // =========================================================================
+    // 🚀 2. STANDARD WINDOW PHYSICS (For Split, Layer, Padding Windows)
+    // =========================================================================
+    currentW = isHorizontal.value ? widthH : widthV;
+    currentH = isHorizontal.value ? heightH : heightV;
 
-      if (edgeToSnap != ScreenEdge.none) {
-        if (enableOrientationChange) {
-          _applyOrientation(edgeToSnap);
-          currentW = isHorizontal.value ? widthH : widthV;
-          currentH = isHorizontal.value ? heightH : heightV;
+    if (enableSnapping && isOpen.value) {
+      double distLeft = x.value;
+      double distRight = screenSize.width - (x.value + currentW);
+      double distTop = y.value;
+      double distBottom = safeBottom - (y.value + currentH);
+
+      if (distLeft < 0) distLeft = 0;
+      if (distRight < 0) distRight = 0;
+      if (distTop < 0) distTop = 0;
+      if (distBottom < 0) distBottom = 0;
+
+      // 🚀 Global Detection Logic (Task 4.2: Standard Window Segment Intersection)
+      // Checks if the window edge is in the detection zone AND the window body intersects the [LP, LP + LW] segment
+      bool snapR =
+          distRight <= detectDistance.value &&
+          (y.value + currentH >= rightPosition.value &&
+              y.value <= rightPosition.value + rightLength.value);
+
+      bool snapL =
+          distLeft <= detectDistance.value &&
+          (y.value + currentH >= leftPosition.value &&
+              y.value <= leftPosition.value + leftLength.value);
+
+      bool snapT =
+          distTop <= detectDistance.value &&
+          (x.value + currentW >= topPosition.value &&
+              x.value <= topPosition.value + topLength.value);
+
+      bool snapB =
+          distBottom <= detectDistance.value &&
+          (x.value + currentW >= bottomPosition.value &&
+              x.value <= bottomPosition.value + bottomLength.value);
+
+      if (snapR || snapL || snapT || snapB) {
+        if (snapR) {
+          x.value = screenSize.width - currentW - rightPadding.value;
+          if (enableOrientationChange) isHorizontal.value = false;
+        } else if (snapL) {
+          x.value = leftPadding.value;
+          if (enableOrientationChange) isHorizontal.value = false;
+        } else if (snapT) {
+          y.value = topPadding.value;
+          x.value = exactTopSnapX ?? ((screenSize.width / 2) - (currentW / 2));
+          if (enableOrientationChange) isHorizontal.value = true;
+        } else if (snapB) {
+          y.value = safeBottom - currentH - bottomPadding.value;
+          x.value =
+              exactBottomSnapX ?? ((screenSize.width / 2) - (currentW / 2));
+          if (enableOrientationChange) isHorizontal.value = true;
         }
-        _executeSnap(edgeToSnap, screenSize, currentW, currentH);
+
+        currentW = isHorizontal.value ? widthH : widthV;
+        currentH = isHorizontal.value ? heightH : heightV;
+
+        if (snapR || snapL) {
+          if (y.value < topPadding.value) y.value = topPadding.value;
+          if (y.value > safeBottom - currentH - bottomPadding.value)
+            y.value = safeBottom - currentH - bottomPadding.value;
+        }
+        return;
       }
     }
 
+    // =======================================================
+    // FREE-FLOATING FALLBACKS
+    // =======================================================
     if (enableDrawerBleed) {
-      _clampWithDrawerBleed(screenSize, currentW, currentH);
-    } else if (enableStrictBoundaryClamp) {
-      _clampToScreen(screenSize, currentW, currentH);
+      double minW = currentW * drawerVisibleRatio;
+      double minH = currentH * drawerVisibleRatio;
+      if (x.value < -currentW + minW) x.value = -currentW + minW;
+      if (x.value > screenSize.width - minW) x.value = screenSize.width - minW;
+      if (y.value < -currentH + minH) y.value = -currentH + minH;
+    }
+
+    // Always uses bottom padding for failsafe
+    if (y.value > safeBottom - currentH - bottomPadding.value) {
+      y.value = safeBottom - currentH - bottomPadding.value;
     }
   }
 
   void adjustForKeyboard(double keyboardHeight, Size screenSize) {
     if (!enableKeyboardAvoidance || keyboardHeight == 0) return;
-    if (enableMinimize && !isOpen.value) return;
-
     double currentH = isHorizontal.value ? heightH : heightV;
     double bottomEdgeOfWindow = y.value + currentH;
     double topOfKeyboard = screenSize.height - keyboardHeight;
-
-    if (bottomEdgeOfWindow > topOfKeyboard) {
+    if (bottomEdgeOfWindow > topOfKeyboard)
       y.value = topOfKeyboard - currentH - 16.0;
-    }
-  }
-
-  // ===========================================================================
-  // INTERNAL MATH HELPERS
-  // ===========================================================================
-
-  bool _checkOffScreenHide(Size screenSize, double w, double h) {
-    return (x.value < -w + hideVisibleThreshold ||
-        x.value > screenSize.width - hideVisibleThreshold ||
-        y.value < -h + hideVisibleThreshold ||
-        y.value > screenSize.height - hideVisibleThreshold);
-  }
-
-  Map<ScreenEdge, double> _detectBoundaries(
-    Size screenSize,
-    double w,
-    double h,
-  ) {
-    // FIX 1: Prevent bottom snapping from going under the phone notch/home bar
-    double safeBottom = screenSize.height - Get.mediaQuery.padding.bottom;
-    return {
-      ScreenEdge.top: y.value,
-      ScreenEdge.bottom: safeBottom - (y.value + h),
-      ScreenEdge.left: x.value,
-      ScreenEdge.right: screenSize.width - (x.value + w),
-    };
-  }
-
-  ScreenEdge _calculateSnapEdge(
-    Map<ScreenEdge, double> distances,
-    double w,
-    double h,
-  ) {
-    ScreenEdge closestEdge = ScreenEdge.none;
-    double minDistance = double.infinity;
-
-    distances.forEach((edge, distance) {
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestEdge = edge;
-      }
-    });
-
-    double collisionThreshold =
-        (closestEdge == ScreenEdge.left || closestEdge == ScreenEdge.right)
-        ? -(w * snapThreshold)
-        : -(h * snapThreshold);
-
-    // FIX 2: Smart Snapping.
-    // It only snaps if you are within 30px of the edge inside the screen,
-    // OR if you are pushing into the wall but haven't crossed the 50% mark yet!
-    // If you drag it past 50%, it lets go so the DrawerBleed can hold it off-screen.
-    if (minDistance <= snapZoneThickness && minDistance >= collisionThreshold) {
-      return closestEdge;
-    }
-
-    return ScreenEdge.none;
-  }
-
-  void _applyOrientation(ScreenEdge edge) {
-    if (edge == ScreenEdge.top || edge == ScreenEdge.bottom) {
-      isHorizontal.value = true;
-    } else if (edge == ScreenEdge.left || edge == ScreenEdge.right) {
-      isHorizontal.value = false;
-    }
-  }
-
-  void _executeSnap(ScreenEdge edge, Size screenSize, double w, double h) {
-    double safeBottom = screenSize.height - Get.mediaQuery.padding.bottom;
-    switch (edge) {
-      case ScreenEdge.top:
-        y.value = edgePadding;
-        break;
-      case ScreenEdge.bottom:
-        y.value = safeBottom - h - edgePadding;
-        break;
-      case ScreenEdge.left:
-        x.value = edgePadding;
-        break;
-      case ScreenEdge.right:
-        x.value = screenSize.width - w - edgePadding;
-        break;
-      case ScreenEdge.none:
-        break;
-    }
-  }
-
-  void _clampToScreen(Size screenSize, double w, double h) {
-    double safeBottom = screenSize.height - Get.mediaQuery.padding.bottom;
-    if (x.value < edgePadding) x.value = edgePadding;
-    if (x.value > screenSize.width - w - edgePadding)
-      x.value = screenSize.width - w - edgePadding;
-    if (y.value < edgePadding) y.value = edgePadding;
-    if (y.value > safeBottom - h - edgePadding)
-      y.value = safeBottom - h - edgePadding;
-  }
-
-  void _clampWithDrawerBleed(Size screenSize, double w, double h) {
-    double minVisibleW = w * drawerVisibleRatio;
-    double minVisibleH = h * drawerVisibleRatio;
-    double safeBottom = screenSize.height - Get.mediaQuery.padding.bottom;
-
-    if (x.value < -w + minVisibleW) x.value = -w + minVisibleW;
-    if (x.value > screenSize.width - minVisibleW)
-      x.value = screenSize.width - minVisibleW;
-    if (y.value < -h + minVisibleH) y.value = -h + minVisibleH;
-    if (y.value > safeBottom - minVisibleH) y.value = safeBottom - minVisibleH;
-  }
-}
-
-/// Visual Debugger: Renders light red striped zones to show exact snapping areas.
-class DebugSnapZonesOverlay extends StatelessWidget {
-  const DebugSnapZonesOverlay({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // Look for ANY registered interactions to read the zone thickness
-    if (!Get.isRegistered<BaseWindowInteractions>(tag: 'Main'))
-      return const SizedBox.shrink();
-    final logic = Get.find<BaseWindowInteractions>(tag: 'Main');
-
-    return Obx(() {
-      if (!logic.showDebugSnap.value) return const SizedBox.shrink();
-
-      final thickness = logic.snapZoneThickness;
-      final safeBottom = MediaQuery.of(context).padding.bottom;
-
-      Widget stripedBar(double w, double h) {
-        return Container(
-          width: w,
-          height: h,
-          decoration: BoxDecoration(
-            color: Colors.redAccent.withOpacity(0.2), // Light red
-            // A simple CSS-like repeating stripe trick in Flutter
-            gradient: const RepeatingLinearGradient(
-              colors: [Colors.transparent, Colors.black12],
-              stops: [0.0, 0.5],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(color: Colors.redAccent, width: 1),
-          ),
-        );
-      }
-
-      return IgnorePointer(
-        // Lets you click through the visual!
-        child: Stack(
-          children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: stripedBar(double.infinity, thickness),
-            ), // Top
-            Positioned(
-              bottom: safeBottom,
-              left: 0,
-              right: 0,
-              child: stripedBar(double.infinity, thickness),
-            ), // Bottom
-            Positioned(
-              top: 0,
-              bottom: 0,
-              left: 0,
-              child: stripedBar(thickness, double.infinity),
-            ), // Left
-            Positioned(
-              top: 0,
-              bottom: 0,
-              right: 0,
-              child: stripedBar(thickness, double.infinity),
-            ), // Right
-          ],
-        ),
-      );
-    });
-  }
-}
-
-// Helper for the stripes
-class RepeatingLinearGradient extends LinearGradient {
-  const RepeatingLinearGradient({
-    required super.colors,
-    required super.stops,
-    super.begin,
-    super.end,
-  });
-  @override
-  Shader createShader(Rect rect, {TextDirection? textDirection}) {
-    return super.createShader(
-      Rect.fromLTWH(0, 0, 20, 20),
-      textDirection: textDirection,
-    ); // 20px stripes
   }
 }

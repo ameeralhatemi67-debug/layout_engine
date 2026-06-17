@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import '../../../controllers/layout_controller.dart';
-import '../../../controllers/base_window_interactions.dart';
+import 'package:layout_engine/controllers/layout_controller.dart';
+import 'package:layout_engine/models/layout_node.dart';
+
+import 'package:layout_engine/controllers/base_window_interactions.dart';
 import '../../components/drag_number_field.dart';
 import '../../components/percentage_drag_field.dart';
 
@@ -20,32 +22,83 @@ class CreateSplitWindowVisual extends StatelessWidget {
 
         final isParent =
             selected.type == 'RowNode' || selected.type == 'ColumnNode';
-        final parentNode = isParent
+
+        // 1. Do a temporary nullable lookup
+        LayoutNode? tempParent = isParent
             ? selected
             : layoutCtrl.findParentOf(layoutCtrl.activeLayout, selected.id);
 
-        if (parentNode == null) return const SizedBox.shrink();
+        // 2. 🚀 FIX: Lock it into a strict, NON-NULLABLE variable!
+        // Dart will now stop complaining because it mathematically guarantees it is never null.
+        final LayoutNode parentNode = tempParent ?? selected;
 
         final children = parentNode.children;
-        final numSplits = children.length;
+
+        // 🚀 FIX: Default to 3 splits in the UI if it's a completely blank slate
+        final numSplits = children.isEmpty ? 3 : children.length;
+
+        // Determine the active visual state for the layout toggles
+        bool isBlankSlate =
+            selected.type == 'ContainerNode' && selected.children.isEmpty;
+        bool isRowActive = isBlankSlate
+            ? layoutCtrl.lastUsedSplitType.value == 'RowNode'
+            : parentNode.type == 'RowNode';
+        bool isColActive = isBlankSlate
+            ? layoutCtrl.lastUsedSplitType.value == 'ColumnNode'
+            : parentNode.type == 'ColumnNode';
 
         // Fetch the God Class explicitly
         final interactions = Get.find<BaseWindowInteractions>(tag: 'Split');
 
         return Obx(() {
           final isHorizontal = interactions.isHorizontal.value;
-          final scale = interactions.windowScale; // Uniform scaling factor
+          final scale = interactions.windowScale;
 
-          // Helper: Scaled Icon Builder (Upgraded for visual disabled states)
+          // ==========================================================
+          // 🎨 CUSTOMIZABLE STYLE VARIABLES (EDIT THESE!)
+          // ==========================================================
+          // 1. Cut Counter Styles (Horizontal Mode)
+          // 3. Selected Split Highlight Styles (The Clean Toggle Look)
+          final Color toggleFillColor = Colors.lightBlueAccent.withOpacity(
+            0.15,
+          ); // Very light blue fill
+          final Color toggleStrokeColor =
+              Colors.lightBlueAccent; // Light blue stroke
+
+          // Adaptive Padding: applies uniformly to ALL items so nothing jumps!
+          final double uniformPadX = isHorizontal ? 14.0 * scale : 6.0 * scale;
+          final double uniformPadY = isHorizontal ? 6.0 * scale : 14.0 * scale;
+
+          // 2. Toolbar Layout Spacing
+          // This controls the gap between the 5 icons and the Cut Counter
+          final double iconToCounterGap = 16.0 * scale;
+
+          // 3. Selected Split Highlight Styles
+          final Color highlightColor = const Color.fromARGB(
+            9,
+            154,
+            217,
+            244,
+          ).withOpacity(0.80);
+
+          // How much wider/taller the split gets when selected in HORIZONTAL view
+          final double hPaddingX = 16.0 * scale; // Width extension
+          final double hPaddingY = 4.0 * scale; // Height extension
+
+          // How much wider/taller the split gets when selected in VERTICAL view
+          final double vPaddingX = 4.0 * scale; // Width extension
+          final double vPaddingY = 16.0 * scale; // Height extension
+          // ==========================================================
+
+          // Helper: Scaled Icon Builder
           Widget buildIcon(
             String asset,
             VoidCallback onTap, {
             VoidCallback? onDoubleTap,
             bool isActive = false,
-            bool isEnabled = true, // 🚀 NEW: Controls the greyed-out state
+            bool isEnabled = true,
           }) {
             return InkWell(
-              // If disabled, intercept the tap and show the snackbar immediately
               onTap: isEnabled
                   ? onTap
                   : () {
@@ -69,7 +122,6 @@ class CreateSplitWindowVisual extends StatelessWidget {
                   width: 28 * scale,
                   height: 28 * scale,
                   colorFilter: ColorFilter.mode(
-                    // Logic to show Grey (Disabled), Blue (Active), or Black (Enabled)
                     !isEnabled
                         ? Colors.grey.withOpacity(0.4)
                         : (isActive ? Colors.blueAccent : Colors.black87),
@@ -93,7 +145,15 @@ class CreateSplitWindowVisual extends StatelessWidget {
               min: 1,
               max: 5,
               onChanged: (newCuts) {
-                layoutCtrl.attemptSplit(newCuts, parentNode.type);
+                // 🚀 FIX: Handle cutting on a blank slate vs an existing layout
+                if (isBlankSlate) {
+                  layoutCtrl.attemptSplit(
+                    newCuts,
+                    layoutCtrl.lastUsedSplitType.value,
+                  );
+                } else {
+                  layoutCtrl.attemptSplit(newCuts, parentNode!.type);
+                }
               },
             ),
           );
@@ -103,57 +163,68 @@ class CreateSplitWindowVisual extends StatelessWidget {
               ? Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    // The Icons are now grouped together and distributed evenly!
                     Expanded(
-                      flex: 1,
-                      child: buildIcon(
-                        'assets/icons/Expand.svg',
-                        () => layoutCtrl.toggleExpand(
-                          layoutCtrl.activeSplitId.value!,
-                        ),
-                        isActive: layoutCtrl.isNodeExpanded(
-                          layoutCtrl.activeSplitId.value,
-                        ),
-                        // 🚀 NEW: Only awake if a split is selected
-                        isEnabled: layoutCtrl.activeSplitId.value != null,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          buildIcon(
+                            'assets/icons/Expand.svg',
+                            () => layoutCtrl.toggleExpand(
+                              layoutCtrl.activeSplitId.value!,
+                            ),
+                            isActive: layoutCtrl.isNodeExpanded(
+                              layoutCtrl.activeSplitId.value,
+                            ),
+                            isEnabled: layoutCtrl.activeSplitId.value != null,
+                          ),
+                          buildIcon(
+                            'assets/icons/lock.svg',
+                            () => layoutCtrl.toggleLock(
+                              layoutCtrl.activeSplitId.value!,
+                            ),
+                            isActive: layoutCtrl.isNodeLocked(
+                              layoutCtrl.activeSplitId.value,
+                            ),
+                            isEnabled: layoutCtrl.activeSplitId.value != null,
+                          ),
+                          buildIcon(
+                            'assets/icons/SpiltEdit.svg',
+                            layoutCtrl.toggleEqualizer,
+                            onDoubleTap: layoutCtrl.resetSplitsToEqual,
+                            isActive: layoutCtrl.isEqualizerOn.value,
+                          ),
+                          buildIcon(
+                            'assets/icons/CreateColumn.svg',
+                            () => layoutCtrl.executeSplitOrSwitch(
+                              'RowNode',
+                              numSplits,
+                            ),
+                            onDoubleTap: layoutCtrl.resetToBlankSlate,
+                            isActive: isRowActive,
+                            isEnabled: true,
+                          ),
+                          buildIcon(
+                            'assets/icons/CreateRows.svg',
+                            () => layoutCtrl.executeSplitOrSwitch(
+                              'ColumnNode',
+                              numSplits,
+                            ),
+                            onDoubleTap: layoutCtrl.resetToBlankSlate,
+                            isActive: isColActive,
+                            isEnabled: true,
+                          ),
+                        ],
                       ),
                     ),
-                    Expanded(
-                      flex: 1,
-                      child: buildIcon(
-                        'assets/icons/lock.svg',
-                        () => layoutCtrl.toggleLock(
-                          layoutCtrl.activeSplitId.value!,
-                        ),
-                        isActive: layoutCtrl.isNodeLocked(
-                          layoutCtrl.activeSplitId.value,
-                        ),
-                        // 🚀 NEW: Only awake if a split is selected
-                        isEnabled: layoutCtrl.activeSplitId.value != null,
-                      ),
-                    ),
-                    Expanded(
-                      flex: 1,
-                      child: buildIcon(
-                        'assets/icons/SpiltEdit.svg',
-                        layoutCtrl
-                            .toggleEqualizer, // Single Tap: Toggles Equalizer
-                        onDoubleTap: layoutCtrl
-                            .resetSplitsToEqual, // Double Tap: Resets All
-                        isActive: layoutCtrl.isEqualizerOn.value,
-                      ),
-                    ),
-                    // FIX: Reduced empty space to 1, gave cutCounter flex 2
-                    const Expanded(flex: 1, child: SizedBox.shrink()),
-                    Expanded(
-                      flex: 2,
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: cutCounter,
-                      ),
-                    ),
+                    // The custom gap between icons and the counter
+                    SizedBox(width: iconToCounterGap),
+                    // The customized Cut Counter
+                    cutCounter,
                   ],
                 )
               : Column(
+                  // Vertical stays exactly the same as requested!
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
@@ -163,18 +234,38 @@ class CreateSplitWindowVisual extends StatelessWidget {
                         child: cutCounter,
                       ),
                     ),
-                    const Expanded(
-                      flex: 2,
-                      child: SizedBox.shrink(),
-                    ), // Empty space from diagram
+                    Expanded(
+                      flex: 1,
+                      child: buildIcon(
+                        'assets/icons/CreateColumn.svg',
+                        () => layoutCtrl.executeSplitOrSwitch(
+                          'RowNode',
+                          numSplits,
+                        ),
+                        onDoubleTap: layoutCtrl.resetToBlankSlate,
+                        isActive: isRowActive,
+                        isEnabled: true,
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: buildIcon(
+                        'assets/icons/CreateRows.svg',
+                        () => layoutCtrl.executeSplitOrSwitch(
+                          'ColumnNode',
+                          numSplits,
+                        ),
+                        onDoubleTap: layoutCtrl.resetToBlankSlate,
+                        isActive: isColActive,
+                        isEnabled: true,
+                      ),
+                    ),
                     Expanded(
                       flex: 1,
                       child: buildIcon(
                         'assets/icons/SpiltEdit.svg',
-                        layoutCtrl
-                            .toggleEqualizer, // Single Tap: Toggles Equalizer
-                        onDoubleTap: layoutCtrl
-                            .resetSplitsToEqual, // Double Tap: Resets All
+                        layoutCtrl.toggleEqualizer,
+                        onDoubleTap: layoutCtrl.resetSplitsToEqual,
                         isActive: layoutCtrl.isEqualizerOn.value,
                       ),
                     ),
@@ -188,7 +279,6 @@ class CreateSplitWindowVisual extends StatelessWidget {
                         isActive: layoutCtrl.isNodeExpanded(
                           layoutCtrl.activeSplitId.value,
                         ),
-                        // 🚀 NEW: Only awake if a split is selected
                         isEnabled: layoutCtrl.activeSplitId.value != null,
                       ),
                     ),
@@ -202,21 +292,16 @@ class CreateSplitWindowVisual extends StatelessWidget {
                         isActive: layoutCtrl.isNodeLocked(
                           layoutCtrl.activeSplitId.value,
                         ),
-                        // 🚀 NEW: Only awake if a split is selected
                         isEnabled: layoutCtrl.activeSplitId.value != null,
                       ),
                     ),
                   ],
                 );
-
           // 3. The Adaptive Percentages Row
           List<Widget> percentageFields = [];
           for (int i = 0; i < children.length; i++) {
             final child = children[i];
             final isSubSelected = layoutCtrl.activeSplitId.value == child.id;
-            // 🚀 NEW: Fetch the states directly from the JSON
-            final isLocked = child.properties['is_locked'] == true;
-            final isExpanded = child.properties['is_expanded'] == true;
 
             percentageFields.add(
               GestureDetector(
@@ -224,16 +309,22 @@ class CreateSplitWindowVisual extends StatelessWidget {
                 onDoubleTap: () => layoutCtrl.toggleActiveSplit(child.id),
                 child: Container(
                   decoration: BoxDecoration(
+                    // 🚀 The Clean Toggle Fill
+                    color: isSubSelected ? toggleFillColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6 * scale),
+                    // 🚀 The Stroke: We use a transparent stroke when unselected so the physical size never changes!
                     border: Border.all(
                       color: isSubSelected
-                          ? Colors.lightBlueAccent
+                          ? toggleStrokeColor
                           : Colors.transparent,
-                      width: 2.0 * scale,
+                      width: 1.5 * scale,
                     ),
-                    borderRadius: BorderRadius.circular(6 * scale),
                   ),
-                  padding: EdgeInsets.all(2.0 * scale),
-                  // 🚀 REVERTED: Back to just the clean drag field!
+                  // 🚀 Fixed Padding: Applied universally so sibling elements NEVER jump or shift!
+                  padding: EdgeInsets.symmetric(
+                    horizontal: uniformPadX,
+                    vertical: uniformPadY,
+                  ),
                   child: PercentageDragField(
                     rawFlexValue: child.properties['is_expanded'] == true
                         ? (child.properties['expanded_flex'] as int? ??
@@ -274,40 +365,31 @@ class CreateSplitWindowVisual extends StatelessWidget {
           // 4. Render Shell
           return Card(
             elevation: 8,
-            color: const Color.fromARGB(255, 247, 244, 255),
+            color: const Color.fromARGB(255, 247, 242, 250),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16 * scale),
+              borderRadius: BorderRadius.circular(12 * scale),
             ),
             child: Container(
-              // Scale the outer box directly
               width: isHorizontal ? interactions.widthH : interactions.widthV,
               height: isHorizontal
                   ? interactions.heightH
                   : interactions.heightV,
-              // Scale the 14px padding directly
               padding: EdgeInsets.all(14.0 * scale),
               child: Flex(
                 direction: isHorizontal ? Axis.vertical : Axis.horizontal,
                 children: [
-                  // Top Half (Controls)
                   Expanded(flex: 1, child: controlsGroup),
-
-                  // Divider Space
                   if (isHorizontal)
                     SizedBox(height: 8 * scale)
                   else
                     SizedBox(width: 8 * scale),
-
-                  // Bottom Half (Percentages scaling via FittedBox)
                   Expanded(
                     flex: 1,
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        // NEW: Center 2 splits, but evenly space 3, 4, and 5 splits!
                         final verticalAlignment = numSplits <= 2
                             ? MainAxisAlignment.center
                             : MainAxisAlignment.spaceBetween;
-
                         return FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.center,
@@ -327,7 +409,7 @@ class CreateSplitWindowVisual extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: isHorizontal
                                   ? MainAxisAlignment.spaceBetween
-                                  : verticalAlignment, // Applied dynamic alignment here!
+                                  : verticalAlignment,
                               children: percentageFields,
                             ),
                           ),

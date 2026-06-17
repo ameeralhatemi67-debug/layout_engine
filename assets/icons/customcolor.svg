@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="11.524167mm"
+   height="11.524201mm"
+   viewBox="0 0 11.524167 11.524201"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+     id="defs1" /><g
+     id="layer1"
+     transform="translate(-871.19974,-475.28225)"><rect
+       style="fill:#1a1a1a;fill-opacity:1;stroke-width:0.112;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;paint-order:markers stroke fill"
+       id="rect523"
+       width="11.524197"
+       height="11.524197"
+       x="871.19971"
+       y="475.28223"
+       ry="1.4069295" /><g
+       id="g526"
+       transform="rotate(-135,893.38341,437.83521)"><path
+         id="path523"
+         style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.11405;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:markers stroke fill"
+         d="m 874.14376,391.49832 c -0.44334,0 -0.79995,0.35713 -0.79995,0.80047 v 6.20686 h 2.19832 v -6.20686 c 0,-0.44334 -0.35713,-0.80047 -0.80047,-0.80047 z m -0.79995,8.33025 v 0.56947 c 0,0.44335 0.35661,0.80047 0.79995,0.80047 h 0.5979 c 0.44334,0 0.80047,-0.35712 0.80047,-0.80047 v -0.56947 z" /><g
+         id="g525"
+         transform="translate(-25.824254,1.8144146)"
+         style="fill:#ffffff"><rect
+           style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.112;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:markers stroke fill"
+           id="rect524"
+           width="1.145918"
+           height="3.0635769"
+           x="584.81213"
+           y="786.211"
+           ry="0.37417734"
+           transform="rotate(-30)" /><rect
+           style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.112;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1;paint-order:markers stroke fill"
+           id="rect525"
+           width="1.145918"
+           height="3.0635769"
+           x="-974.49615"
+           y="-114.05602"
+           ry="0.37417734"
+           transform="matrix(-0.8660254,-0.5,-0.5,0.8660254,0,0)" /><circle
+           style="fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke-width:0.398629"
+           id="circle525"
+           cx="900.26501"
+           cy="388.36276"
+           r="0.47179782" /></g></g></g></svg>

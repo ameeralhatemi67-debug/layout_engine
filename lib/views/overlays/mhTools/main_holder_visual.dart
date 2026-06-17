@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:layout_engine/controllers/window_manager.dart';
-import '../../../controllers/layout_controller.dart';
-import '../../../controllers/base_window_interactions.dart';
+import 'package:layout_engine/controllers/layout_controller.dart';
+
+import 'package:layout_engine/controllers/base_window_interactions.dart';
+import 'package:layout_engine/views/overlays/Settings/settings_page.dart';
 
 class MainHolderVisual extends StatelessWidget {
   const MainHolderVisual({super.key});
@@ -71,6 +73,7 @@ class MainHolderVisual extends StatelessWidget {
       List<Widget> children = [
         buildIconBtn(
           icon: buildSvg('assets/icons/MainHolder.svg', Colors.black87),
+
           // Passing screen size for the new Grid Anchor Math
           onTap: () => interactions.toggleOpen(MediaQuery.of(context).size),
           tooltip: 'Drag or Minimize',
@@ -156,6 +159,21 @@ class MainHolderVisual extends StatelessWidget {
 
           buildDivider(),
 
+          // 🚀 THE NEW SETTINGS TRIGGER
+          buildIconBtn(
+            icon: buildSvg('assets/icons/settings.svg', Colors.black87),
+            onTap: () {
+              // Opens the page overlay with a transparent barrier so the blur works
+              Get.dialog(
+                const SettingsPage(),
+                barrierColor: Colors.transparent,
+              );
+            },
+            tooltip: 'Workspace Settings',
+          ),
+
+          buildDivider(),
+
           buildIconBtn(
             icon: buildSvg('assets/icons/CopyIcon.svg', Colors.blueAccent),
             onTap: layoutCtrl.copyCodeToClipboard,
@@ -166,10 +184,11 @@ class MainHolderVisual extends StatelessWidget {
 
       // 3. Render
       return Card(
-        elevation: 6,
+        elevation: 8, // 🚀 UNIFIED
+        color: const Color.fromARGB(255, 247, 242, 250), // 🚀 UNIFIED
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(10.0),
           child: Flex(
             direction: isHorizontal ? Axis.horizontal : Axis.vertical,
             mainAxisSize: MainAxisSize.min,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:layout_engine/controllers/layout_controller.dart';
 import 'package:layout_engine/controllers/window_manager.dart';
-import '../../../controllers/layout_controller.dart';
 import 'package:layout_engine/controllers/base_window_interactions.dart';
 
 class CreateHolderVisual extends StatelessWidget {
@@ -78,16 +78,61 @@ class CreateHolderVisual extends StatelessWidget {
 
       if (isOpen) {
         children.addAll([
-          buildDivider(),
+          // 🚀 Task 2.1: The Dynamic Split Button
+          // Automatically reads the last used type to display the correct SVG and logic
           buildIconBtn(
-            icon: buildSvg('assets/icons/CreateColumn.svg'),
-            onTap: () => layoutCtrl.attemptSplit(3, 'RowNode'),
-            tooltip: 'Create 3 Columns',
+            icon: buildSvg(
+              layoutCtrl.lastUsedSplitType.value == 'RowNode'
+                  ? 'assets/icons/CreateColumn.svg'
+                  : 'assets/icons/CreateRows.svg',
+            ),
+            onTap: () {
+              final logic = Get.find<BaseWindowInteractions>(tag: 'Split');
+              if (logic.isOpen.value) {
+                logic.isOpen.value = false; // Close if already open
+              } else {
+                // Execute using the memory tracker!
+                logic.openSplitWindow(MediaQuery.of(context).size);
+                if (Get.isRegistered<WindowManager>()) {
+                  Get.find<WindowManager>().bringToFront('Split');
+                }
+              }
+            },
+            tooltip: layoutCtrl.lastUsedSplitType.value == 'RowNode'
+                ? 'Create 3 Columns'
+                : 'Create 3 Rows',
           ),
           buildIconBtn(
-            icon: buildSvg('assets/icons/CreateRows.svg'),
-            onTap: () => layoutCtrl.attemptSplit(3, 'ColumnNode'),
-            tooltip: 'Create 3 Rows',
+            icon: buildSvg('assets/icons/Padding.svg'),
+            onTap: () {
+              final selectedId = layoutCtrl.singleSelectedNode?.id;
+
+              if (layoutCtrl.isPaddingValidTarget(selectedId)) {
+                if (Get.isRegistered<BaseWindowInteractions>(tag: 'Padding')) {
+                  final logic = Get.find<BaseWindowInteractions>(
+                    tag: 'Padding',
+                  );
+
+                  if (logic.isOpen.value) {
+                    logic.isOpen.value = false;
+                  } else {
+                    logic.openSplitWindow(MediaQuery.of(context).size);
+                    if (Get.isRegistered<WindowManager>()) {
+                      Get.find<WindowManager>().bringToFront('Padding');
+                    }
+                  }
+                }
+              } else {
+                Get.snackbar(
+                  'Invalid Target',
+                  'Padding can only be applied to empty leaf nodes. Select a single empty container.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.redAccent,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            tooltip: 'Toggle Padding',
           ),
           buildDivider(),
           buildIconBtn(
@@ -102,44 +147,15 @@ class CreateHolderVisual extends StatelessWidget {
           ),
           buildIconBtn(
             icon: buildSvg('assets/icons/Square.svg'),
-            onTap: () => Get.snackbar('Coming Soon', 'Square Widget'),
-            tooltip: 'Add Square',
-          ),
-
-          // 🚀 NEW: The Padding Trigger
-          buildIconBtn(
-            icon: buildSvg('assets/icons/Padding.svg'),
             onTap: () {
-              final selectedId = layoutCtrl.singleSelectedNode?.id;
-
-              // 1. Check if the selection is a valid leaf node
-              if (layoutCtrl.isPaddingValidTarget(selectedId)) {
-                // 2. Spawn the window with anti-overlap
-                if (Get.isRegistered<BaseWindowInteractions>(tag: 'Padding')) {
-                  final logic = Get.find<BaseWindowInteractions>(
-                    tag: 'Padding',
-                  );
-                  logic.openSplitWindow(MediaQuery.of(context).size);
-                  // Optional: if you have anti-overlap enabled for toolbars, trigger it here
-                }
-
-                // 3. Bring to front
-                if (Get.isRegistered<WindowManager>()) {
-                  Get.find<WindowManager>().bringToFront('Padding');
-                }
-              } else {
-                // Reject invalid targets
-                Get.snackbar(
-                  'Invalid Target',
-                  'Padding can only be applied to empty leaf nodes. Select a single empty container.',
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.redAccent,
-                  colorText: Colors.white,
-                );
-              }
+              // 🚀 NEW: Toggles the Blue/Red Outer Detection Zones!
+              Get.find<BaseWindowInteractions>(
+                tag: 'Main',
+              ).showDetectionZones.toggle();
             },
-            tooltip: 'Add Padding',
+            tooltip: 'Toggle Detection Limits',
           ),
+
           buildIconBtn(
             icon: buildSvg('assets/icons/Triangle.svg'),
             // <--- CONNECTED THE TOGGLE HERE!
@@ -163,24 +179,43 @@ class CreateHolderVisual extends StatelessWidget {
       // 3. Render with Scrollable Bounds
       final screenSize = MediaQuery.of(context).size;
 
+      // 🚀 THE FIX: Split the children list!
+      // The first item becomes the solid drag handle. The rest go into the scroll view.
+      final fixedChild = children.first;
+      final scrollableChildren = children.sublist(1);
+
       return Card(
-        elevation: 6,
+        elevation: 8,
+        color: const Color.fromARGB(255, 247, 242, 250),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
           padding: const EdgeInsets.all(8.0),
-          // Set absolute max boundaries so it knows when to activate the ScrollView
           constraints: BoxConstraints(
             maxWidth: isHorizontal ? screenSize.width - 32 : 60,
             maxHeight: isHorizontal ? 60 : screenSize.height - 100,
           ),
-          child: SingleChildScrollView(
-            // Dynamically change scroll axis based on the snap orientation!
-            scrollDirection: isHorizontal ? Axis.horizontal : Axis.vertical,
-            child: Flex(
-              direction: isHorizontal ? Axis.horizontal : Axis.vertical,
-              mainAxisSize: MainAxisSize.min,
-              children: children,
-            ),
+          child: Flex(
+            direction: isHorizontal ? Axis.horizontal : Axis.vertical,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 1. The Solid First Icon (Does not scroll)
+              fixedChild,
+
+              // 2. The Scrollable Tools
+              Flexible(
+                child: SingleChildScrollView(
+                  scrollDirection: isHorizontal
+                      ? Axis.horizontal
+                      : Axis.vertical,
+                  child: Flex(
+                    direction: isHorizontal ? Axis.horizontal : Axis.vertical,
+                    mainAxisSize: MainAxisSize.min,
+                    children: scrollableChildren,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );

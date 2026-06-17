@@ -7,8 +7,10 @@ import 'package:layout_engine/views/overlays/create_holder.dart';
 import 'package:layout_engine/views/overlays/main_holder.dart';
 import 'package:layout_engine/views/overlays/create_split_window.dart';
 import 'package:layout_engine/views/overlays/padding_panel.dart';
+import 'package:layout_engine/controllers/layout_controller.dart';
+import 'views/overlays/debug_visualizer.dart';
+
 import 'views/overlays/layer_window.dart';
-import 'controllers/layout_controller.dart';
 import 'services/storage_service.dart';
 
 import 'views/canvas/canvas_view.dart';
@@ -17,9 +19,17 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
 
-  // Instantiate the controllers here
   Get.put(LayoutController());
   final winManager = Get.put(WindowManager());
+
+  Get.put(
+    BaseWindowInteractions()
+      ..setupAsToolbar(length: 280.0)
+      ..exactTopSnapX = 16.0
+      ..exactBottomSnapX = 16.0
+      ..isHidden.value = false,
+    tag: 'Main',
+  );
 
   // 🚀 OS REGISTRY: Register all your dynamic windows here!
   // When you build new windows in the future, just add one line here.

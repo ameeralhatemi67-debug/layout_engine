@@ -3,8 +3,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:layout_engine/controllers/layout_controller.dart';
 import 'package:layout_engine/controllers/base_window_interactions.dart';
-import 'package:layout_engine/views/components/interactive_square_painter.dart';
-import 'package:layout_engine/views/components/manual_padding_slider.dart';
 
 class PaddingPanelVisual extends StatefulWidget {
   const PaddingPanelVisual({super.key});
@@ -27,13 +25,17 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
     'light_purple',
   ];
 
+  /// Task 4: The Color Cycler Logic
   void _cycleColor(String nodeId, LayoutController ctrl, int direction) {
+    final node = ctrl
+        .activeLayout; // Need deep search if nested, but assuming singleSelectedNode
     final activeNode = ctrl.singleSelectedNode;
     if (activeNode == null) return;
 
     String currentColor =
         activeNode.properties['padding_color'] ?? 'light_orange';
     int idx = themeColors.indexOf(currentColor);
+
     if (idx == -1) idx = 0;
 
     int newIdx = (idx + direction) % themeColors.length;
@@ -58,12 +60,15 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
     }
   }
 
+  /// Handles single taps for selecting the outer padding sides
   void _handleSingleTap(Offset localPosition, Size size) {
     final double dx = localPosition.dx - (size.width / 2);
     final double dy = localPosition.dy - (size.height / 2);
 
+    // If the user clicked the center square, completely ignore the single tap!
     if (dx.abs() < 25 && dy.abs() < 25) return;
 
+    // Check Quadrants (Trapezoids)
     String clickedSide;
     if (dx.abs() > dy.abs()) {
       clickedSide = dx > 0 ? 'right' : 'left';
@@ -71,30 +76,45 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
       clickedSide = dy > 0 ? 'bottom' : 'top';
     }
 
+    // Apply Global/Exclusive Selection Logic
     setState(() {
+      // 🚀 THE FIX: Clone the set to force a memory reference change for the CustomPainter!
       Set<String> nextSides = Set<String>.from(activeSides);
+
       if (isGlobal) {
-        if (nextSides.contains(clickedSide))
+        if (nextSides.contains(clickedSide)) {
           nextSides.remove(clickedSide);
-        else
+        } else {
           nextSides.add(clickedSide);
+        }
       } else {
+        // Exclusive Mode (Global OFF)
         nextSides.clear();
         nextSides.add(clickedSide);
       }
+
+      // Overwrite the old variable with the brand new memory reference
       activeSides = nextSides;
     });
   }
 
+  /// Handles double taps strictly for toggling Manual Mode in the center
   void _handleDoubleTap(Offset localPosition, Size size) {
     final double dx = localPosition.dx - (size.width / 2);
     final double dy = localPosition.dy - (size.height / 2);
 
+    // 🚀 NEW: Only trigger if the double tap was inside the center square
+    // Increased the hitbox to 30 so it's very easy to double-click!
     if (dx.abs() < 30 && dy.abs() < 30) {
       setState(() {
         isManualMode = !isManualMode;
         if (isManualMode && activeSides.isEmpty) {
-          activeSides = {'left', 'right', 'top', 'bottom'};
+          activeSides = {
+            'left',
+            'right',
+            'top',
+            'bottom',
+          }; // Select all for manual
         }
       });
     }
@@ -112,6 +132,7 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
         final currentColor =
             node.properties['padding_color'] as String? ?? 'light_orange';
 
+        // Task 2: Calculate Dynamic Max for Standard Mode
         double standardSliderValue = 0.0;
         int activeCount = activeSides.length;
         double maxSliderValue = 100.0;
@@ -119,6 +140,7 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
         if (!isManualMode) {
           if (activeCount > 0) {
             maxSliderValue = 100.0 / activeCount;
+            // Get average or highest of currently active sides to set the slider thumb
             double sum = 0;
             for (String side in activeSides) {
               sum += (padding[side] as num?)?.toDouble() ?? 0.0;
@@ -130,22 +152,27 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
           }
         }
 
+        // Fetch UI Scale
         final scale = Get.find<BaseWindowInteractions>(
           tag: 'Padding',
         ).windowScale;
 
         return Card(
           elevation: 8,
-          color: const Color.fromARGB(255, 247, 242, 250),
+          color: const Color.fromARGB(255, 247, 244, 255),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12 * scale),
+            borderRadius: BorderRadius.circular(16 * scale),
           ),
           child: Container(
             padding: EdgeInsets.all(12 * scale),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // ==========================================
+                // TASK 1: The Interactive Square UI
+                // ==========================================
                 GestureDetector(
+                  // 🚀 NEW: Bind the two separate gesture events
                   onTapUp: (details) => _handleSingleTap(
                     details.localPosition,
                     Size(80 * scale, 80 * scale),
@@ -165,13 +192,18 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
                 ),
                 SizedBox(width: 16 * scale),
 
+                // ==========================================
+                // TASK 2: The Slider Engine
+                // ==========================================
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    // Toolbar Row (Global Toggle & Color)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Task 4: The Color Cycler
                         GestureDetector(
                           onTap: () => _cycleColor(node.id, layoutCtrl, 1),
                           onDoubleTap: () =>
@@ -195,6 +227,8 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
                           ),
                         ),
                         SizedBox(width: 12 * scale),
+
+                        // Task 3: Global Toggle
                         GestureDetector(
                           onTap: () => setState(() => isGlobal = !isGlobal),
                           child: SvgPicture.asset(
@@ -211,9 +245,13 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
                     ),
                     SizedBox(height: 8 * scale),
 
+                    // 🚀 FIXED: The Rigid Slider Container
+                    // This forces the height to permanently accommodate 4 sliders,
+                    // preventing the window from physically "jumping" or resizing!
                     SizedBox(
-                      height: 96 * scale,
+                      height: 96 * scale, // Exactly 4 sliders * 24 height
                       child: !isManualMode
+                          // STANDARD MODE (Single Slider Centered)
                           ? Align(
                               alignment: Alignment.centerRight,
                               child: SizedBox(
@@ -243,41 +281,42 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
                                 ),
                               ),
                             )
+                          // MANUAL MODE (4 Stacked Sliders)
                           : Column(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                ManualPaddingSlider(
-                                  side: 'left',
-                                  label: 'L',
-                                  padding: padding,
-                                  nodeId: node.id,
-                                  layoutCtrl: layoutCtrl,
-                                  scale: scale,
+                                _buildManualSlider(
+                                  'left',
+                                  'L',
+                                  padding,
+                                  node.id,
+                                  layoutCtrl,
+                                  scale,
                                 ),
-                                ManualPaddingSlider(
-                                  side: 'right',
-                                  label: 'R',
-                                  padding: padding,
-                                  nodeId: node.id,
-                                  layoutCtrl: layoutCtrl,
-                                  scale: scale,
+                                _buildManualSlider(
+                                  'right',
+                                  'R',
+                                  padding,
+                                  node.id,
+                                  layoutCtrl,
+                                  scale,
                                 ),
-                                ManualPaddingSlider(
-                                  side: 'top',
-                                  label: 'U',
-                                  padding: padding,
-                                  nodeId: node.id,
-                                  layoutCtrl: layoutCtrl,
-                                  scale: scale,
+                                _buildManualSlider(
+                                  'top',
+                                  'U',
+                                  padding,
+                                  node.id,
+                                  layoutCtrl,
+                                  scale,
                                 ),
-                                ManualPaddingSlider(
-                                  side: 'bottom',
-                                  label: 'D',
-                                  padding: padding,
-                                  nodeId: node.id,
-                                  layoutCtrl: layoutCtrl,
-                                  scale: scale,
+                                _buildManualSlider(
+                                  'bottom',
+                                  'D',
+                                  padding,
+                                  node.id,
+                                  layoutCtrl,
+                                  scale,
                                 ),
                               ],
                             ),
@@ -290,5 +329,166 @@ class _PaddingPanelVisualState extends State<PaddingPanelVisual> {
         );
       },
     );
+  }
+
+  /// Helper to build the stacked manual sliders with their clamped maximums
+  Widget _buildManualSlider(
+    String side,
+    String label,
+    Map<String, dynamic> padding,
+    String nodeId,
+    LayoutController layoutCtrl,
+    double scale,
+  ) {
+    double currentVal = (padding[side] as num?)?.toDouble() ?? 0.0;
+    double maxVal = 100.0;
+
+    // Mathematically clamp sliders against their opposite sides
+    if (side == 'left')
+      maxVal = 100.0 - ((padding['right'] as num?)?.toDouble() ?? 0.0);
+    if (side == 'right')
+      maxVal = 100.0 - ((padding['left'] as num?)?.toDouble() ?? 0.0);
+    if (side == 'top')
+      maxVal = 100.0 - ((padding['bottom'] as num?)?.toDouble() ?? 0.0);
+    if (side == 'bottom')
+      maxVal = 100.0 - ((padding['top'] as num?)?.toDouble() ?? 0.0);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 140 * scale,
+          height: 24 * scale, // Squish them closer together
+          child: SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 4 * scale,
+              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6 * scale),
+              thumbColor: Colors.black87,
+              activeTrackColor: Colors.black87,
+              inactiveTrackColor: Colors.grey.shade300,
+            ),
+            child: Slider(
+              value: currentVal.clamp(0.0, maxVal),
+              min: 0,
+              max: maxVal == 0 ? 1 : maxVal, // Prevent max=0 error
+              onChanged: (val) {
+                layoutCtrl.updatePaddingManual(nodeId, side, val.round());
+              },
+              onChangeEnd: (_) => layoutCtrl.saveState(), // Auto-Save
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 20 * scale,
+          child: Text(
+            label,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16 * scale),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==========================================================
+// TASK 1: The Interactive Square Painter (Place at bottom of file)
+// ==========================================================
+class InteractiveSquarePainter extends CustomPainter {
+  final Set<String> activeSides;
+  final bool isManualMode;
+  final Color centerColor;
+
+  InteractiveSquarePainter({
+    required this.activeSides,
+    required this.isManualMode,
+    required this.centerColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintStroke = Paint()
+      ..color = Colors.black87
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..strokeJoin = StrokeJoin.miter;
+
+    final paintActive = Paint()
+      ..color = Colors.black87
+      ..style = PaintingStyle.fill;
+
+    // Inner Square Bounds
+    final double innerW = size.width * 0.45;
+    final double innerH = size.height * 0.45;
+    final Rect innerRect = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height / 2),
+      width: innerW,
+      height: innerH,
+    );
+
+    // Outer Square Bounds
+    final Rect outerRect = Rect.fromLTWH(0, 0, size.width, size.height);
+
+    // Coordinate Points for the Trapezoids
+    final Offset tlO = outerRect.topLeft;
+    final Offset trO = outerRect.topRight;
+    final Offset blO = outerRect.bottomLeft;
+    final Offset brO = outerRect.bottomRight;
+
+    final Offset tlI = innerRect.topLeft;
+    final Offset trI = innerRect.topRight;
+    final Offset blI = innerRect.bottomLeft;
+    final Offset brI = innerRect.bottomRight;
+
+    // Helper to draw filled trapezoids if active
+    void drawTrapezoid(
+      Offset p1,
+      Offset p2,
+      Offset p3,
+      Offset p4,
+      String side,
+    ) {
+      if (activeSides.contains(side) && !isManualMode) {
+        final path = Path()
+          ..moveTo(p1.dx, p1.dy)
+          ..lineTo(p2.dx, p2.dy)
+          ..lineTo(p3.dx, p3.dy)
+          ..lineTo(p4.dx, p4.dy)
+          ..close();
+        canvas.drawPath(path, paintActive);
+      }
+    }
+
+    // Draw active fills FIRST so borders draw cleanly on top
+    drawTrapezoid(tlO, trO, trI, tlI, 'top');
+    drawTrapezoid(blO, brO, brI, blI, 'bottom');
+    drawTrapezoid(tlO, blO, blI, tlI, 'left');
+    drawTrapezoid(trO, brO, brI, trI, 'right');
+
+    // Draw the structural wireframe borders
+    canvas.drawRect(outerRect, paintStroke);
+    canvas.drawRect(innerRect, paintStroke);
+    canvas.drawLine(tlO, tlI, paintStroke); // Top-Left diagonal
+    canvas.drawLine(trO, trI, paintStroke); // Top-Right diagonal
+    canvas.drawLine(blO, blI, paintStroke); // Bottom-Left diagonal
+    canvas.drawLine(brO, brI, paintStroke); // Bottom-Right diagonal
+
+    // Fill the center if Manual Mode is active
+    // Fill the center if Manual Mode is active
+    if (isManualMode) {
+      final centerPaint = Paint()
+        ..color = Colors.lightBlueAccent
+        ..style = PaintingStyle.fill;
+      canvas.drawRect(innerRect, centerPaint);
+    }
+    // 🚀 FIXED: Removed the else block!
+    // Now, if isManualMode is false, the center remains completely transparent
+    // and decoupled from the theme color.
+  }
+
+  @override
+  bool shouldRepaint(covariant InteractiveSquarePainter oldDelegate) {
+    return oldDelegate.activeSides != activeSides ||
+        oldDelegate.isManualMode != isManualMode ||
+        oldDelegate.centerColor != centerColor;
   }
 }

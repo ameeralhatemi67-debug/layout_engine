@@ -36,6 +36,9 @@ class CreateSplitWindow extends StatelessWidget {
         child: Listener(
           onPointerDown: (_) => Get.find<WindowManager>().bringToFront('Split'),
           child: GestureDetector(
+            // 🚀 THE FIX: This solidifies the entire window into a flawless 1:1 hitbox!
+            behavior: HitTestBehavior.opaque,
+
             onPanUpdate: interactions.onPanUpdate,
             onPanEnd: (details) =>
                 interactions.onPanEnd(details, MediaQuery.of(context).size),

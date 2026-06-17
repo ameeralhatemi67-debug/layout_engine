@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:layout_engine/controllers/base_window_interactions.dart';
 import 'package:layout_engine/views/canvas/expanded_viewport.dart';
 import 'package:layout_engine/views/canvas/padding_visualizer.dart';
-import '../../controllers/layout_controller.dart';
+import 'package:layout_engine/controllers/layout_controller.dart';
 import '../../models/layout_node.dart';
 
 class CanvasView extends StatelessWidget {
@@ -14,14 +14,35 @@ class CanvasView extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetBuilder<LayoutController>(
       builder: (controller) {
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
-          // FIX: Now listens exclusively to the canvas wireframe state
-          color: controller.showCanvasWireframes.value
-              ? Colors.white
-              : Colors.transparent,
-          child: _buildNode(controller.activeLayout, controller, isRoot: true),
+        return GestureDetector(
+          // 🚀 NEW: Translucent allows the background to catch clicks even when transparent!
+          behavior: HitTestBehavior.translucent,
+          onTap: () {
+            // 1. Clear all active selections so the UI updates
+            controller.selectedNodeIds.clear();
+            controller.activeSplitId.value = null;
+            controller.update();
+
+            // 2. Loop through dynamic tooling windows and close them
+            final transientWindows = ['Split', 'Padding'];
+            for (var tag in transientWindows) {
+              if (Get.isRegistered<BaseWindowInteractions>(tag: tag)) {
+                Get.find<BaseWindowInteractions>(tag: tag).isOpen.value = false;
+              }
+            }
+          },
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: controller.showCanvasWireframes.value
+                ? Colors.white
+                : Colors.transparent,
+            child: _buildNode(
+              controller.activeLayout,
+              controller,
+              isRoot: true,
+            ),
+          ),
         );
       },
     );
@@ -103,6 +124,7 @@ class CanvasView extends StatelessWidget {
       // 2. Leaf Node Mapping
       content = GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onTap: () {},
         onDoubleTap: () => controller.exclusiveSelectNode(node.id),
         onLongPress: () {
           final parent = controller.findParentOf(
@@ -165,30 +187,31 @@ class CanvasView extends StatelessWidget {
                           'light_orange',
                     ),
                     // 🚀 CHANGED: If locked, show ONLY the icon. If unlocked, show ONLY the text.
-                    child: isLocked
-                        ? SvgPicture.asset(
-                            'assets/icons/lock.svg',
-                            width:
-                                24, // Bumped back up to 16px since it's the only item
-                            height: 24,
-                            colorFilter: const ColorFilter.mode(
-                              Color.fromARGB(118, 0, 0, 0),
-                              BlendMode.srcIn,
+                    child: Center(
+                      child: isLocked
+                          ? SvgPicture.asset(
+                              'assets/icons/lock.svg',
+                              width: 24,
+                              height: 24,
+                              colorFilter: const ColorFilter.mode(
+                                Color.fromARGB(118, 0, 0, 0),
+                                BlendMode.srcIn,
+                              ),
+                            )
+                          : Text(
+                              node.properties['layer_name'] ??
+                                  node.id.substring(0, 4),
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.blueAccent
+                                    : Colors.grey.shade400,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                fontSize: 12,
+                              ),
                             ),
-                          )
-                        : Text(
-                            node.properties['layer_name'] ??
-                                node.id.substring(0, 4),
-                            style: TextStyle(
-                              color: isSelected
-                                  ? Colors.blueAccent
-                                  : Colors.grey.shade400,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              fontSize: 12,
-                            ),
-                          ),
+                    ),
                   )
                 : null,
           ),

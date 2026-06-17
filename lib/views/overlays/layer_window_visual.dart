@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../../controllers/layout_controller.dart';
+import 'package:layout_engine/controllers/layout_controller.dart';
 import '../../../models/layout_node.dart';
 
 class LayerWindowVisual extends StatelessWidget {
@@ -12,7 +12,8 @@ class LayerWindowVisual extends StatelessWidget {
     return GetBuilder<LayoutController>(
       builder: (controller) {
         return Card(
-          elevation: 6,
+          elevation: 8,
+          color: const Color.fromARGB(255, 247, 242, 250),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
