@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
-import 'package:layout_engine/controllers/window_manager.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
+import 'package:layout_engine/logic/window_manager.dart';
 
-import 'package:layout_engine/views/overlays/create_holder.dart';
-import 'package:layout_engine/views/overlays/main_holder.dart';
-import 'package:layout_engine/views/overlays/create_split_window.dart';
-import 'package:layout_engine/views/overlays/padding_panel.dart';
-import 'package:layout_engine/controllers/layout_controller.dart';
-import 'views/overlays/debug_visualizer.dart';
+import 'package:layout_engine/ui/windows/create/create_holder.dart';
+import 'package:layout_engine/ui/windows/main/main_holder.dart';
+import 'package:layout_engine/ui/windows/split/create_split_window.dart';
+import 'package:layout_engine/ui/windows/padding/padding_panel.dart';
+import 'package:layout_engine/logic/layout_controller.dart';
+import 'ui/windows/debug/debug_visualizer.dart';
 
-import 'views/overlays/layer_window.dart';
-import 'services/storage_service.dart';
+import 'ui/windows/layer/layer_window.dart';
+import 'data/services/storage_service.dart';
 
-import 'views/canvas/canvas_view.dart';
+import 'ui/canvas/canvas_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
