@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
-import '../../controllers/window_manager.dart';
-import 'mhTools/main_holder_visual.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
+import 'package:layout_engine/logic/layout_controller.dart';
+import 'package:layout_engine/logic/window_manager.dart';
+import 'package:layout_engine/ui/windows/main/main_holder_visual.dart';
 
 class MainHolder extends StatelessWidget {
   const MainHolder({super.key});
@@ -11,6 +12,7 @@ class MainHolder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final interactions = Get.find<BaseWindowInteractions>(tag: 'Main');
+    final layoutCtrl = Get.find<LayoutController>();
 
     // This forces the window to read the config coordinates!
     interactions.applyDefaultPosition('Main', MediaQuery.of(context).size);
@@ -68,7 +70,41 @@ class MainHolder extends StatelessWidget {
             onPanEnd: (details) =>
                 interactions.onPanEnd(details, MediaQuery.of(context).size),
             // Ensure you are importing your visual file at the top!
-            child: const MainHolderVisual(),
+            child: MainHolderVisual(
+              isHorizontal: interactions.isHorizontal.value,
+              isOpen: interactions.isOpen.value, // ADDED
+              canUndo: layoutCtrl.canUndo.value,
+              canRedo: layoutCtrl.canRedo.value,
+              showCanvasWireframes: layoutCtrl.showCanvasWireframes.value,
+              onUndo: layoutCtrl.undo,
+              onRedo: layoutCtrl.redo,
+              onToggleWireframe: layoutCtrl.toggleWireframe,
+              onToggleLayerWindow: layoutCtrl.toggleLayerWindow,
+              onCopyCode:
+                  layoutCtrl.copyCodeToClipboard, // FIX: Properly mapped
+              onToggleOpen: () =>
+                  interactions.toggleOpen(MediaQuery.of(context).size), // ADDED
+              onToggleCreateTools: () {
+                // ADDED: Moved all Get.find logic here!
+                final createLogic = Get.find<BaseWindowInteractions>(
+                  tag: 'Create',
+                );
+                createLogic.isHidden.value = !createLogic.isHidden.value;
+                if (!createLogic.isHidden.value) {
+                  createLogic.isOpen.value = true;
+                  final screenSize = MediaQuery.of(context).size;
+                  final activeRects = createLogic.getActiveWindowRects(
+                    'Create',
+                  );
+                  createLogic.spawnWithAntiOverlap(
+                    screenSize,
+                    activeRects,
+                    'Create',
+                  );
+                  Get.find<WindowManager>().bringToFront('Create');
+                }
+              },
+            ),
           ),
         ),
       );

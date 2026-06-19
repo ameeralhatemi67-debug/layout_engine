@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
 
 class DebugSnapZonesOverlay extends StatelessWidget {
   const DebugSnapZonesOverlay({super.key});

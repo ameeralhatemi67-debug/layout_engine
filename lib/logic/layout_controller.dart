@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
-import 'package:layout_engine/controllers/math_engine.dart';
-import 'package:layout_engine/controllers/window_manager.dart';
 import 'package:flutter/services.dart';
-
-import '../models/layout_node.dart';
-import '../services/code_generator_service.dart';
-import '../services/error_handling.dart';
-
-// Import the new Mixins!
-import 'mixins/history_manager.dart';
-import 'mixins/padding_manager.dart';
+import 'package:get/get.dart';
+import 'package:layout_engine/core/math/math_engine.dart';
+import 'package:layout_engine/core/mixins/history_manager.dart';
+import 'package:layout_engine/core/mixins/padding_manager.dart';
+import 'package:layout_engine/data/models/layout_node.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
+import 'package:layout_engine/logic/window_manager.dart';
+import 'package:layout_engine/services/code_generator_service.dart';
+import 'package:layout_engine/services/error_handling.dart';
 
 class LayoutController extends GetxController
     with HistoryManager, PaddingManager {
@@ -562,10 +559,16 @@ class LayoutController extends GetxController
     }
   }
 
+  // Inside lib/logic/layout_controller.dart
   void copyCodeToClipboard() {
-    final String generatedCode = CodeGeneratorService.generateCode(
+    // Fetch the new package
+    final exportPackage = CodeGeneratorService.generateExportPackage(
       activeLayout,
     );
+
+    // Extract just the monolith string for the quick-copy action
+    final String generatedCode = exportPackage.singleMonolith.codeContent;
+
     Clipboard.setData(ClipboardData(text: generatedCode))
         .then((_) {
           ErrorHandler.showSuccess(

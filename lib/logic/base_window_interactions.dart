@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/controllers/window_config.dart';
+import 'package:layout_engine/core/config/window_config.dart';
 
 class BaseWindowInteractions extends GetxController {
   var x = 0.0.obs;
@@ -163,6 +163,15 @@ class BaseWindowInteractions extends GetxController {
     isHorizontal.value = true;
     x.value = 20.0;
     y.value = 20.0;
+  }
+
+  void closeWindow() {
+    isOpen.value = false;
+  }
+
+  void openWindow() {
+    isOpen.value = true;
+    isHidden.value = false; // Failsafe to ensure it isn't hidden
   }
 
   void openSplitWindow(Size screenSize) {

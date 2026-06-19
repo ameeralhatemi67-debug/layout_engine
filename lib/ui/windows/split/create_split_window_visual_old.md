@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/data/models/layout_node.dart';
-import 'package:layout_engine/logic/base_window_interactions.dart';
-import 'package:layout_engine/logic/layout_controller.dart';
+import 'package:layout_engine/controllers/layout_controller.dart';
+import 'package:layout_engine/models/layout_node.dart';
 
+import 'package:layout_engine/controllers/base_window_interactions.dart';
 import '../../components/drag_number_field.dart';
 import '../../components/percentage_drag_field.dart';
 

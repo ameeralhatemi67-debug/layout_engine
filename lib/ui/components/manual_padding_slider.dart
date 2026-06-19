@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../controllers/layout_controller.dart';
+import 'package:layout_engine/logic/layout_controller.dart';
 
 class ManualPaddingSlider extends StatelessWidget {
   final String side;

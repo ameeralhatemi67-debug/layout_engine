@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-import 'base_window_interactions.dart';
 
 /// Centralizes default values, hard boundaries, and visual scaling math
 /// for the Figma-style workspace physics configuration layout.

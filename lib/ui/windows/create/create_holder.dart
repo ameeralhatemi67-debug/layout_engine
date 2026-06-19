@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/controllers/window_manager.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
-import 'chTools/create_holder_visual.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
+import 'package:layout_engine/logic/window_manager.dart';
+import 'package:layout_engine/ui/windows/create/create_holder_visual.dart';
+import 'package:layout_engine/logic/layout_controller.dart';
 
 class CreateHolder extends StatelessWidget {
   const CreateHolder({super.key});
@@ -27,6 +28,7 @@ class CreateHolder extends StatelessWidget {
       if (interactions.isHidden.value) {
         return const SizedBox.shrink();
       }
+      final layoutCtrl = Get.find<LayoutController>();
 
       return Positioned(
         left: interactions.x.value,
@@ -38,7 +40,30 @@ class CreateHolder extends StatelessWidget {
             onPanUpdate: interactions.onPanUpdate,
             onPanEnd: (details) =>
                 interactions.onPanEnd(details, MediaQuery.of(context).size),
-            child: const CreateHolderVisual(),
+            // 🚀 The fully mapped Dumb Child
+            child: CreateHolderVisual(
+              isHorizontal: interactions.isHorizontal.value,
+              isOpen: interactions.isOpen.value,
+              lastUsedSplitType: layoutCtrl.lastUsedSplitType.value,
+              onToggleOpen: () =>
+                  interactions.toggleOpen(MediaQuery.of(context).size),
+              onSplitOrSwitch: (type, count) {
+                final logic = Get.find<BaseWindowInteractions>(tag: 'Split');
+                if (logic.isOpen.value) {
+                  logic.isOpen.value = false; // Close if already open
+                } else {
+                  // Execute using the memory tracker!
+                  logic.openSplitWindow(MediaQuery.of(context).size);
+                  Get.find<WindowManager>().bringToFront('Split');
+                }
+              },
+              onTogglePadding: () {
+                // Moved from the visual file!
+                final logic = Get.find<BaseWindowInteractions>(tag: 'Padding');
+                logic.isOpen.value = !logic.isOpen.value;
+                Get.find<WindowManager>().bringToFront('Padding');
+              },
+            ),
           ),
         ),
       );

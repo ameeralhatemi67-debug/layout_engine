@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import '../../models/layout_node.dart';
+import 'package:layout_engine/data/models/layout_node.dart';
 
 /// Handles the mathematical boundary rules for layout offsets
 mixin PaddingManager on GetxController {

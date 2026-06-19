@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:layout_engine/controllers/math_engine.dart';
+import 'package:layout_engine/core/math/math_engine.dart';
 // Adjust path if your project name differs
 
 void main() {

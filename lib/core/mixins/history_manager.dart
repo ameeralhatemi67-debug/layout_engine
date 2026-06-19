@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:get/get.dart';
-import '../../models/layout_node.dart';
-import '../../services/storage_service.dart';
+import 'package:layout_engine/data/models/layout_node.dart';
+import 'package:layout_engine/data/services/storage_service.dart';
 
 /// Handles the Undo/Redo Memento Stack and Hive Persistence
 mixin HistoryManager on GetxController {

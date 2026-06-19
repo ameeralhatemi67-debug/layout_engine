@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/views/overlays/layer_window_visual.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
-import '../../controllers/window_manager.dart';
-import 'package:layout_engine/controllers/layout_controller.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
+import 'package:layout_engine/logic/layout_controller.dart';
+import 'package:layout_engine/logic/window_manager.dart';
+import 'package:layout_engine/ui/windows/layer/layer_window_visual.dart';
 
 class LayerWindow extends StatelessWidget {
   const LayerWindow({super.key});

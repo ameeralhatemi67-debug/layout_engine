@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/controllers/layout_controller.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
-import 'package:layout_engine/views/components/interactive_square_painter.dart';
-import 'package:layout_engine/views/components/manual_padding_slider.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
+import 'package:layout_engine/logic/layout_controller.dart';
+import 'package:layout_engine/ui/components/interactive_square_painter.dart';
+import 'package:layout_engine/ui/components/manual_padding_slider.dart';
 
 class PaddingPanelVisual extends StatefulWidget {
   const PaddingPanelVisual({super.key});

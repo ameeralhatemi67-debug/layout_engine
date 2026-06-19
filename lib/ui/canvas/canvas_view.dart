@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
-import 'package:layout_engine/views/canvas/expanded_viewport.dart';
-import 'package:layout_engine/views/canvas/padding_visualizer.dart';
-import 'package:layout_engine/controllers/layout_controller.dart';
-import '../../models/layout_node.dart';
+import 'package:layout_engine/data/models/layout_node.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
+import 'package:layout_engine/logic/layout_controller.dart';
+import 'package:layout_engine/ui/canvas/expanded_viewport.dart';
+import 'package:layout_engine/ui/canvas/padding_visualizer.dart';
 
 class CanvasView extends StatelessWidget {
   const CanvasView({super.key});

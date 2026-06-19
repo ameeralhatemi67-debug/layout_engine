@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:layout_engine/controllers/base_window_interactions.dart';
-import 'package:layout_engine/controllers/window_manager.dart';
-import 'package:layout_engine/views/overlays/chTools/padding_panel_visual.dart';
+import 'package:layout_engine/logic/base_window_interactions.dart';
+import 'package:layout_engine/logic/window_manager.dart';
+import 'package:layout_engine/ui/windows/padding/padding_panel_visual.dart';
 
 class PaddingPanel extends StatelessWidget {
   const PaddingPanel({super.key});

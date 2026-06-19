@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:layout_engine/controllers/snapping_config_manager.dart'; // Keep your existing math manager!
+// Keep your existing math manager!
 
 class DetectionSnappingPanel extends StatelessWidget {
   final double draftDetect;

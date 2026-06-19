@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:layout_engine/controllers/layout_controller.dart';
-import '../../../models/layout_node.dart';
+import 'package:layout_engine/data/models/layout_node.dart';
+import 'package:layout_engine/logic/layout_controller.dart';
 
 class LayerWindowVisual extends StatelessWidget {
   const LayerWindowVisual({super.key});

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/layout_node.dart';
+import 'package:layout_engine/data/models/layout_node.dart';
 
 class ExpandedViewport extends StatelessWidget {
   final LayoutNode node;
